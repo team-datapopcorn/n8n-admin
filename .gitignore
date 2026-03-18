@@ -1,0 +1,21 @@
+# 민감 정보 — 절대 커밋하지 마세요
+.env
+
+# 워크플로우 데이터 폴더 (스크립트 실행 시 자동 생성됨)
+server1/
+server2/
+server3/
+server4/
+server5/
+
+# macOS
+.DS_Store
+
+# Node.js
+node_modules/
+admin/.next/
+admin/node_modules/
+admin/.env.local
+
+# 로그
+*.log
