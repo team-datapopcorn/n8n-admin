@@ -58,7 +58,7 @@ export default function SettingsClient() {
       {servers.map((server, i) => (
         <Card key={i}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">서버 {i + 1}</CardTitle>
+            <CardTitle className="text-base">{server.name || `서버 ${i + 1}`}</CardTitle>
             <Button
               variant="ghost"
               size="icon"
