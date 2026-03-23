@@ -72,6 +72,33 @@ brew install jq
 
 ---
 
+## Desktop App (macOS)
+
+개발 도구 설치 없이 n8n 서버를 관리하고 싶다면 데스크톱 앱을 사용하세요.
+
+### 설치
+
+1. [최신 릴리즈](https://github.com/datapopcorn/n8n-admin/releases)에서 `n8n-Admin.dmg` 다운로드
+2. DMG를 열고 `n8n Admin`을 Applications 폴더로 드래그
+3. 앱 실행 → 서버 URL과 API 키 입력 → 끝!
+
+> macOS에서 "확인되지 않은 개발자" 경고가 나타나면:
+> 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기" 클릭
+
+### 직접 빌드
+
+```bash
+# 의존성 설치
+npm install
+cd admin && pnpm install && cd ..
+
+# DMG 빌드
+./scripts/build-desktop.sh
+# dist/ 폴더에 DMG 파일이 생성됩니다
+```
+
+---
+
 ## 서버 추가
 
 `.env`에 서버 항목을 추가하고 `scripts/_common.sh`에도 case를 추가합니다.
@@ -103,6 +130,7 @@ server2) N8N_URL="${SERVER2_URL:-}"; API_KEY="${SERVER2_API_KEY:-}" ;;
 | `invite-users.sh` | 유저 초대 | `./scripts/invite-users.sh server1 user@example.com` |
 | `list-credentials.sh` | 크레덴셜 목록 | `./scripts/list-credentials.sh server1` |
 | `delete-credential.sh` | 크레덴셜 삭제 | `./scripts/delete-credential.sh server1 abc123` |
+| `cleanup-workflows.sh` | 중복/불필요 워크플로우 정리 | `./scripts/cleanup-workflows.sh server1 --execute` |
 | `migration-checklist.sh` | 서버 이관 체크리스트 | `./scripts/migration-checklist.sh server1 server2` |
 | `gcp-vm.sh` | GCP VM 제어 | `./scripts/gcp-vm.sh status` |
 
