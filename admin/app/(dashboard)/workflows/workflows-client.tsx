@@ -48,16 +48,14 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
     queryKey: ['workflows-all', server],
     queryFn: async () => {
       const all: N8nWorkflow[] = []
-      let cursor: string | null = null
+      let cursor: string | undefined = undefined
       do {
-        const url = cursor
-          ? `/api/servers/${server}/workflows?limit=100&cursor=${cursor}`
-          : `/api/servers/${server}/workflows?limit=100`
-        const res = await fetch(url)
+        const params = cursor ? `?limit=100&cursor=${cursor}` : '?limit=100'
+        const res = await fetch(`/api/servers/${server}/workflows${params}`)
         if (!res.ok) throw new Error(`${res.status}`)
-        const json = await res.json()
-        all.push(...(json.data ?? []))
-        cursor = json.nextCursor ?? null
+        const json: { data: N8nWorkflow[]; nextCursor: string | null } = await res.json()
+        all.push(...json.data)
+        cursor = json.nextCursor ?? undefined
       } while (cursor)
       return all
     },
@@ -181,7 +179,7 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         {/* Owner filter */}
         {ownerOptions.length > 0 && (
           <div className="flex items-center gap-1">
-            <Select value={filterOwner} onValueChange={setFilterOwner}>
+            <Select value={filterOwner} onValueChange={(v) => setFilterOwner(v ?? '')}>
               <SelectTrigger className="w-48 h-9 text-xs">
                 <SelectValue placeholder="Owner 필터" />
               </SelectTrigger>
@@ -202,7 +200,7 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         {/* Tag filter */}
         {tagOptions.length > 0 && (
           <div className="flex items-center gap-1">
-            <Select value={filterTag} onValueChange={setFilterTag}>
+            <Select value={filterTag} onValueChange={(v) => setFilterTag(v ?? '')}>
               <SelectTrigger className="w-40 h-9 text-xs">
                 <SelectValue placeholder="태그 필터" />
               </SelectTrigger>
