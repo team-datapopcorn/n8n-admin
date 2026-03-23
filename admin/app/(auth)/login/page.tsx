@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  // Electron auto-login
+  useEffect(() => {
+    if (window.electronAPI?.isElectron) {
+      setLoading(true)
+      window.electronAPI.getSessionPassword().then(async (pw) => {
+        const result = await signIn('credentials', { password: pw, redirect: false })
+        if (result?.error) {
+          setLoading(false)
+        } else {
+          router.push('/')
+        }
+      })
+    }
+  }, [router])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -24,6 +39,15 @@ export default function LoginPage() {
     } else {
       router.push('/')
     }
+  }
+
+  // Show loading state during Electron auto-login
+  if (typeof window !== 'undefined' && window.electronAPI?.isElectron && loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/40">
+        <p className="text-muted-foreground">로그인 중...</p>
+      </div>
+    )
   }
 
   return (
