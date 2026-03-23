@@ -19,7 +19,14 @@ export interface N8nWorkflow {
   connections?: unknown
   settings?: unknown
   tags?: { id: string; name: string }[]
+  shared?: { role: string; projectId: string }[]
   versionId?: string
+}
+
+export interface N8nProject {
+  id: string
+  name: string
+  type: 'personal' | 'team'
 }
 
 export interface N8nUser {

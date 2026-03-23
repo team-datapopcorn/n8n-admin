@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -11,53 +11,72 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { ServerConfig, N8nWorkflow } from '@/lib/types'
-import { Copy, Trash2, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ServerConfig, N8nWorkflow, N8nProject } from '@/lib/types'
+import { Copy, Trash2, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 
-type SortKey = 'name' | 'active' | 'archived' | 'nodes' | 'updatedAt'
+type SortKey = 'name' | 'active' | 'archived' | 'owner' | 'nodes' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
+
+function getOwnerName(workflow: N8nWorkflow, projects: N8nProject[]): string {
+  const ownerShared = workflow.shared?.find((s) => s.role === 'workflow:owner')
+  if (!ownerShared) return '-'
+  const project = projects.find((p) => p.id === ownerShared.projectId)
+  if (!project) return '-'
+  // personal project: "Name <email>" → extract email
+  if (project.type === 'personal') {
+    const match = project.name.match(/<(.+?)>/)
+    return match ? match[1] : project.name
+  }
+  return project.name
+}
 
 export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }) {
   const [server, setServer] = useState<string>(servers[0]?.id ?? '')
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filterOwner, setFilterOwner] = useState<string>('')
+  const [filterTag, setFilterTag] = useState<string>('')
   const [viewWorkflow, setViewWorkflow] = useState<N8nWorkflow | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [copyWorkflow, setCopyWorkflow] = useState<N8nWorkflow | null>(null)
   const [copyTarget, setCopyTarget] = useState<string>(servers[1]?.id ?? servers[0]?.id ?? '')
   const qc = useQueryClient()
 
-  const {
-    data,
-    isLoading,
-    isError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery<{ data: N8nWorkflow[]; nextCursor: string | null }>({
-    queryKey: ['workflows', server],
-    queryFn: ({ pageParam }) => {
-      const cursor = pageParam ? `&cursor=${pageParam}` : ''
-      return fetch(`/api/servers/${server}/workflows?limit=30${cursor}`).then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`)
-        return r.json()
-      })
+  // Fetch ALL workflows (paginated internally)
+  const { data: workflows = [], isLoading, isError } = useQuery<N8nWorkflow[]>({
+    queryKey: ['workflows-all', server],
+    queryFn: async () => {
+      const all: N8nWorkflow[] = []
+      let cursor: string | null = null
+      do {
+        const url = cursor
+          ? `/api/servers/${server}/workflows?limit=100&cursor=${cursor}`
+          : `/api/servers/${server}/workflows?limit=100`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`${res.status}`)
+        const json = await res.json()
+        all.push(...(json.data ?? []))
+        cursor = json.nextCursor ?? null
+      } while (cursor)
+      return all
     },
-    initialPageParam: null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 5 * 60 * 1000,
   })
 
-  const allWorkflows = data?.pages.flatMap((p) => p.data) ?? []
-  const totalLoaded = allWorkflows.length
+  // Fetch projects for owner mapping
+  const { data: projects = [] } = useQuery<N8nProject[]>({
+    queryKey: ['projects', server],
+    queryFn: () => fetch(`/api/servers/${server}/projects`).then((r) => r.ok ? r.json() : []),
+    staleTime: 10 * 60 * 1000,
+  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
       fetch(`/api/servers/${server}/workflows/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       toast.success('워크플로우가 삭제되었습니다.')
-      qc.invalidateQueries({ queryKey: ['workflows', server] })
+      qc.invalidateQueries({ queryKey: ['workflows-all', server] })
       setDeleteId(null)
     },
     onError: () => toast.error('삭제에 실패했습니다.'),
@@ -72,18 +91,33 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
       }),
     onSuccess: () => {
       toast.success(`${servers.find(s => s.id === copyTarget)?.name ?? copyTarget} 서버로 복사되었습니다.`)
-      qc.invalidateQueries({ queryKey: ['workflows', copyTarget] })
+      qc.invalidateQueries({ queryKey: ['workflows-all', copyTarget] })
       setCopyWorkflow(null)
     },
     onError: () => toast.error('복사에 실패했습니다.'),
   })
+
+  // Extract unique owners and tags for filter dropdowns
+  const { ownerOptions, tagOptions } = useMemo(() => {
+    const owners = new Set<string>()
+    const tags = new Set<string>()
+    for (const w of workflows) {
+      const owner = getOwnerName(w, projects)
+      if (owner !== '-') owners.add(owner)
+      for (const t of w.tags ?? []) tags.add(t.name)
+    }
+    return {
+      ownerOptions: [...owners].sort(),
+      tagOptions: [...tags].sort(),
+    }
+  }, [workflows, projects])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      setSortDir('asc')
+      setSortDir(key === 'updatedAt' ? 'desc' : 'asc')
     }
   }
 
@@ -94,29 +128,38 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
       : <ArrowDown size={12} className="ml-1 text-foreground" />
   }
 
-  const filtered = allWorkflows
-    .filter((w) => w.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      let cmp = 0
-      if (sortKey === 'name') {
-        cmp = a.name.localeCompare(b.name, 'ko')
-      } else if (sortKey === 'active') {
-        cmp = Number(b.active) - Number(a.active)
-      } else if (sortKey === 'archived') {
-        cmp = Number(a.isArchived ?? false) - Number(b.isArchived ?? false)
-      } else if (sortKey === 'nodes') {
-        cmp = ((a.nodes as unknown[])?.length ?? 0) - ((b.nodes as unknown[])?.length ?? 0)
-      } else if (sortKey === 'updatedAt') {
-        cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-      }
-      return sortDir === 'asc' ? cmp : -cmp
-    })
+  const filtered = useMemo(() => {
+    return workflows
+      .filter((w) => {
+        if (search && !w.name.toLowerCase().includes(search.toLowerCase())) return false
+        if (filterOwner && getOwnerName(w, projects) !== filterOwner) return false
+        if (filterTag && !(w.tags ?? []).some((t) => t.name === filterTag)) return false
+        return true
+      })
+      .sort((a, b) => {
+        let cmp = 0
+        if (sortKey === 'name') {
+          cmp = a.name.localeCompare(b.name, 'ko')
+        } else if (sortKey === 'active') {
+          cmp = Number(b.active) - Number(a.active)
+        } else if (sortKey === 'archived') {
+          cmp = Number(a.isArchived ?? false) - Number(b.isArchived ?? false)
+        } else if (sortKey === 'owner') {
+          cmp = getOwnerName(a, projects).localeCompare(getOwnerName(b, projects))
+        } else if (sortKey === 'nodes') {
+          cmp = ((a.nodes as unknown[])?.length ?? 0) - ((b.nodes as unknown[])?.length ?? 0)
+        } else if (sortKey === 'updatedAt') {
+          cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+        }
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+  }, [workflows, projects, search, filterOwner, filterTag, sortKey, sortDir])
 
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">워크플로우</h2>
 
-      <Tabs value={server} onValueChange={(v) => setServer(v)}>
+      <Tabs value={server} onValueChange={(v) => { setServer(v); setFilterOwner(''); setFilterTag('') }}>
         <TabsList>
           {servers.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>{s.name}</TabsTrigger>
@@ -124,8 +167,8 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         </TabsList>
       </Tabs>
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-48 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="워크플로우 검색..."
@@ -134,8 +177,51 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
             className="pl-8"
           />
         </div>
+
+        {/* Owner filter */}
+        {ownerOptions.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Select value={filterOwner} onValueChange={setFilterOwner}>
+              <SelectTrigger className="w-48 h-9 text-xs">
+                <SelectValue placeholder="Owner 필터" />
+              </SelectTrigger>
+              <SelectContent>
+                {ownerOptions.map((o) => (
+                  <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filterOwner && (
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setFilterOwner('')}>
+                <X size={14} />
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Tag filter */}
+        {tagOptions.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Select value={filterTag} onValueChange={setFilterTag}>
+              <SelectTrigger className="w-40 h-9 text-xs">
+                <SelectValue placeholder="태그 필터" />
+              </SelectTrigger>
+              <SelectContent>
+                {tagOptions.map((t) => (
+                  <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filterTag && (
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setFilterTag('')}>
+                <X size={14} />
+              </Button>
+            )}
+          </div>
+        )}
+
         <span className="text-sm text-muted-foreground">
-          {filtered.length} / {totalLoaded}개 로드됨
+          {filtered.length} / {workflows.length}개
         </span>
       </div>
 
@@ -149,6 +235,12 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                 </button>
               </TableHead>
               <TableHead className="text-muted-foreground">ID</TableHead>
+              <TableHead>
+                <button onClick={() => handleSort('owner')} className="flex items-center hover:text-foreground transition-colors">
+                  Owner<SortIcon col="owner" />
+                </button>
+              </TableHead>
+              <TableHead>Tags</TableHead>
               <TableHead>
                 <button onClick={() => handleSort('active')} className="flex items-center hover:text-foreground transition-colors">
                   Published<SortIcon col="active" />
@@ -175,19 +267,19 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
-                  불러오는 중...
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                  전체 워크플로우 불러오는 중...
                 </TableCell>
               </TableRow>
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-destructive text-sm py-10">
+                <TableCell colSpan={9} className="text-center text-destructive text-sm py-10">
                   워크플로우를 불러오지 못했습니다.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   워크플로우 없음
                 </TableCell>
               </TableRow>
@@ -205,6 +297,18 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                     </a>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground font-mono">{w.id}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-32 truncate">
+                    {getOwnerName(w, projects)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(w.tags ?? []).map((t) => (
+                        <Badge key={t.id} variant="outline" className="text-xs font-normal">
+                          {t.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={w.active ? 'default' : 'secondary'}>
                       {w.active ? 'Yes' : 'No'}
@@ -241,14 +345,6 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
           </TableBody>
         </Table>
       </div>
-
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-            {isFetchingNextPage ? '불러오는 중...' : '30개 더 불러오기'}
-          </Button>
-        </div>
-      )}
 
       {/* 상세 보기 */}
       <Dialog open={!!viewWorkflow} onOpenChange={() => setViewWorkflow(null)}>

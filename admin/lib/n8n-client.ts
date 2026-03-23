@@ -1,4 +1,4 @@
-import { ServerConfig, N8nWorkflow, N8nUser, N8nCredential } from './types'
+import { ServerConfig, N8nWorkflow, N8nUser, N8nCredential, N8nProject } from './types'
 
 async function fetchAllPages<T>(url: string, apiKey: string): Promise<T[]> {
   const results: T[] = []
@@ -121,6 +121,16 @@ export async function deleteUser(server: ServerConfig, id: string): Promise<void
     headers: { 'X-N8N-API-KEY': server.apiKey },
   })
   if (!res.ok) throw new Error(`Failed to delete user: ${res.status}`)
+}
+
+export async function listProjects(server: ServerConfig): Promise<N8nProject[]> {
+  const res = await fetch(`${server.url}/api/v1/projects?limit=250`, {
+    headers: { 'X-N8N-API-KEY': server.apiKey, Accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (!res.ok) return [] // projects API may not exist on older versions
+  const json = await res.json()
+  return json.data ?? []
 }
 
 export async function listCredentials(server: ServerConfig): Promise<N8nCredential[]> {
