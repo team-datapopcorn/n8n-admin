@@ -1,20 +1,30 @@
+import fs from 'fs'
 import { ServerConfig } from './types'
 
 /**
- * .env에서 서버 목록을 읽어 반환합니다.
+ * .env 또는 JSON 파일에서 서버 목록을 읽어 반환합니다.
  *
- * env 키 규칙:
- *   server1 → SERVER_URL / SERVER_API_KEY / SERVER_NAME
- *   server2 → SERVER2_URL / SERVER2_API_KEY / SERVER2_NAME
- *   server3 → SERVER3_URL / SERVER3_API_KEY / SERVER3_NAME
- *
- * ⚠️ 서버 번호는 연속해야 합니다.
- *    SERVER_URL과 SERVER3_URL은 있지만 SERVER2_URL이 없으면 server3는 무시됩니다.
+ * Electron 환경: ELECTRON_CONFIG_PATH가 설정되면 해당 JSON 파일에서 읽음.
+ * 웹 환경: process.env에서 SERVER_URL, SERVER_API_KEY 등을 읽음.
  *
  * ⚠️ 이 함수는 서버 컴포넌트에서만 호출하세요.
- *    process.env는 클라이언트 컴포넌트에서 접근할 수 없습니다.
  */
 export function getServers(): ServerConfig[] {
+  // Electron: JSON 파일에서 읽기
+  const configPath = process.env.ELECTRON_CONFIG_PATH
+  if (configPath) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+        return data.servers ?? []
+      }
+    } catch (err) {
+      console.error('Failed to read Electron config:', err)
+    }
+    return []
+  }
+
+  // 웹: .env에서 읽기
   const servers: ServerConfig[] = []
 
   let i = 1
