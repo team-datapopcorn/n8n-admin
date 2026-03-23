@@ -29,6 +29,8 @@ export default function Sidebar({ showGcp, showSettings }: SidebarProps) {
 
   return (
     <aside className="flex flex-col w-56 min-h-screen border-r bg-background px-3 py-4">
+      {/* macOS 트래픽 라이트 + 윈도우 드래그 영역 */}
+      <div className="mb-2 h-8 [-webkit-app-region:drag]" />
       <div className="mb-6 px-2">
         <h1 className="font-bold text-lg">n8n Admin</h1>
       </div>

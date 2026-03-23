@@ -11,7 +11,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <Sidebar showGcp={showGcp} showSettings={showSettings} />
-      <main className="flex-1 p-6 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto">
+        <div className="h-8 [-webkit-app-region:drag]" />
+        <div className="px-6 pb-6">{children}</div>
+      </main>
     </div>
   )
 }
