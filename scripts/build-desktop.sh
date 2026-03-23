@@ -21,7 +21,15 @@ mkdir -p build/standalone
 
 # rsync -aL로 심볼릭 링크를 역참조하여 실제 파일로 복사
 # (electron-builder는 심볼릭 링크를 처리하지 못함)
-rsync -aL admin/.next/standalone/ build/standalone/ 2>/dev/null || true
+rsync -aL \
+  --exclude='**/typescript' \
+  --exclude='**/typescript@*' \
+  --exclude='**/@img' \
+  --exclude='**/@img+*' \
+  --exclude='**/sharp' \
+  --exclude='**/sharp@*' \
+  --exclude='**/*.map' \
+  admin/.next/standalone/ build/standalone/ 2>/dev/null || true
 mkdir -p build/standalone/admin/.next
 rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
 rsync -aL admin/public/ build/standalone/admin/public/

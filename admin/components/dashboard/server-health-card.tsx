@@ -6,14 +6,15 @@ import { Badge } from '@/components/ui/badge'
 import { ServerId } from '@/lib/types'
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
 
-const SERVER_META: Record<ServerId, { name: string; url: string; description: string }> = {
-  cloud:    { name: 'Cloud',   url: 'https://datapopcorn.app.n8n.cloud', description: 'Pro · 내부 직원' },
-  'gcp-vm': { name: 'GCP VM', url: 'https://n8n.datapopcorn.win',       description: 'Enterprise · 인프런' },
-  railway:  { name: 'Railway', url: 'https://n8n.datapopcorn.xyz',      description: 'Community · 패스트캠퍼스' },
+interface ServerHealthCardProps {
+  serverId: ServerId
+  name?: string
+  url?: string
+  description?: string
 }
 
-export default function ServerHealthCard({ serverId }: { serverId: ServerId }) {
-  const meta = SERVER_META[serverId]
+export default function ServerHealthCard({ serverId, name, url, description }: ServerHealthCardProps) {
+  const displayName = name ?? serverId
 
   const { data, isLoading } = useQuery({
     queryKey: ['health', serverId],
@@ -24,7 +25,7 @@ export default function ServerHealthCard({ serverId }: { serverId: ServerId }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-semibold">{meta.name}</CardTitle>
+        <CardTitle className="text-base font-semibold">{displayName}</CardTitle>
         {isLoading ? (
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
         ) : data?.alive ? (
@@ -34,7 +35,7 @@ export default function ServerHealthCard({ serverId }: { serverId: ServerId }) {
         )}
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-xs text-muted-foreground">{meta.description}</p>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
 
         {!isLoading && (
           <>
@@ -61,15 +62,17 @@ export default function ServerHealthCard({ serverId }: { serverId: ServerId }) {
           </>
         )}
 
-        <a
-          href={meta.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
-        >
-          <ExternalLink size={12} />
-          {meta.url.replace('https://', '')}
-        </a>
+        {url && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+          >
+            <ExternalLink size={12} />
+            {url.replace('https://', '')}
+          </a>
+        )}
       </CardContent>
     </Card>
   )

@@ -21,7 +21,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {servers.map((s) => (
-            <ServerHealthCard key={s.id} serverId={s.id} />
+            <ServerHealthCard key={s.id} serverId={s.id} name={s.name} url={s.url} description={s.description} />
           ))}
         </div>
       )}
