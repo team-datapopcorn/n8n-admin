@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { LayoutDashboard, Workflow, Users, Key, Server, LogOut } from 'lucide-react'
+import { LayoutDashboard, Workflow, Users, Key, Server, Settings, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -18,11 +18,14 @@ const GCP_NAV = { href: '/gcp', label: 'GCP VM', icon: Server }
 
 interface SidebarProps {
   showGcp: boolean
+  showSettings?: boolean
 }
 
-export default function Sidebar({ showGcp }: SidebarProps) {
+export default function Sidebar({ showGcp, showSettings }: SidebarProps) {
   const pathname = usePathname()
-  const nav = showGcp ? [...BASE_NAV, GCP_NAV] : BASE_NAV
+  const nav = [...BASE_NAV]
+  if (showGcp) nav.push(GCP_NAV)
+  if (showSettings) nav.push({ href: '/settings', label: '설정', icon: Settings })
 
   return (
     <aside className="flex flex-col w-56 min-h-screen border-r bg-background px-3 py-4">

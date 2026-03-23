@@ -12,7 +12,9 @@ export default function DashboardPage() {
       </div>
       {servers.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          .env에 SERVER_URL과 SERVER_API_KEY를 입력하면 서버 상태가 표시됩니다.
+          {process.env.ELECTRON_CONFIG_PATH
+            ? '설정에서 서버를 추가하면 상태가 표시됩니다.'
+            : '.env에 SERVER_URL과 SERVER_API_KEY를 입력하면 서버 상태가 표시됩니다.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
