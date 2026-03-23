@@ -18,9 +18,10 @@ cd "$REPO_ROOT"
 echo "=== 2/4: standalone 출력물 복사 ==="
 rm -rf build/standalone
 mkdir -p build/standalone
-cp -r admin/.next/standalone/* build/standalone/
-cp -r admin/.next/static build/standalone/admin/.next/static
-cp -r admin/public build/standalone/admin/public
+# rsync로 복사 (pnpm 심볼릭 링크를 역참조하여 실제 파일 복사)
+rsync -aL admin/.next/standalone/ build/standalone/
+rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
+rsync -aL admin/public/ build/standalone/admin/public/
 
 echo "=== 3/4: Electron 코드 컴파일 ==="
 npx tsc -p desktop/tsconfig.json
