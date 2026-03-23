@@ -25,3 +25,4 @@ desktop/dist/
 dist/
 build/standalone/
 *.dmg
+build/icon.iconset/
