@@ -65,9 +65,9 @@ function writeConfigFile(): string {
 
 function getStandalonePath(): string {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'standalone', 'server.js')
+    return path.join(process.resourcesPath, 'standalone', 'admin', 'server.js')
   }
-  return path.join(__dirname, '..', 'build', 'standalone', 'server.js')
+  return path.join(__dirname, '..', 'build', 'standalone', 'admin', 'server.js')
 }
 
 async function startNextServer(): Promise<number> {
