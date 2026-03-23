@@ -1,6 +1,8 @@
 import ServerHealthCard from '@/components/dashboard/server-health-card'
 import { getServers } from '@/lib/server-config'
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardPage() {
   const servers = getServers()
 
