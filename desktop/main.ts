@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import Store from 'electron-store'
-import { fork, ChildProcess } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
@@ -67,7 +67,8 @@ function getStandalonePath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'standalone', 'admin', 'server.js')
   }
-  return path.join(__dirname, '..', 'build', 'standalone', 'admin', 'server.js')
+  // __dirname = desktop/dist/, so go up twice to reach repo root
+  return path.join(__dirname, '..', '..', 'build', 'standalone', 'admin', 'server.js')
 }
 
 async function startNextServer(): Promise<number> {
@@ -86,7 +87,10 @@ async function startNextServer(): Promise<number> {
     throw new Error(`server.js not found at ${serverJs}`)
   }
 
-  nextProcess = fork(serverJs, [], {
+  // spawn with ELECTRON_RUN_AS_NODE=1 so Electron binary acts as plain Node.js.
+  // cwd must be the standalone dir so Next.js can resolve its node_modules.
+  const standaloneDir = path.dirname(serverJs)
+  nextProcess = spawn(process.execPath, [serverJs], {
     env: {
       ELECTRON_RUN_AS_NODE: '1',
       NODE_ENV: 'production',
@@ -96,12 +100,11 @@ async function startNextServer(): Promise<number> {
       ADMIN_PASSWORD: sessionPassword,
       NEXTAUTH_SECRET: store.get('nextauthSecret'),
       NEXTAUTH_URL: `http://localhost:${port}`,
+      AUTH_TRUST_HOST: 'true',
     },
+    cwd: standaloneDir,
     stdio: 'pipe',
   })
-
-  // ELECTRON_RUN_AS_NODE=1 tells the Electron binary (process.execPath) to behave as
-  // plain Node.js when spawned as a child. fork() uses process.execPath by default.
   nextProcess.on('error', (err) => {
     console.error('Next.js server error:', err)
   })
