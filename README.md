@@ -78,7 +78,7 @@ brew install jq
 
 ### 설치
 
-1. [최신 릴리즈](https://github.com/datapopcorn/n8n-admin/releases)에서 `n8n-Admin.dmg` 다운로드
+1. [최신 릴리즈](https://github.com/team-datapopcorn/n8n-admin/releases)에서 `n8n.Admin-1.0.0-arm64.dmg` 다운로드
 2. DMG를 열고 `n8n Admin`을 Applications 폴더로 드래그
 3. 앱 실행 → 서버 URL과 API 키 입력 → 끝!
 
