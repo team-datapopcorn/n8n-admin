@@ -19,3 +19,9 @@ admin/.env.local
 
 # 로그
 *.log
+
+# Electron
+desktop/dist/
+dist/
+build/standalone/
+*.dmg
