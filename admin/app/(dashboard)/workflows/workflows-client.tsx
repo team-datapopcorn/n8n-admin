@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { ServerConfig, N8nWorkflow } from '@/lib/types'
 import { Copy, Trash2, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 
-type SortKey = 'name' | 'active' | 'nodes' | 'updatedAt'
+type SortKey = 'name' | 'active' | 'archived' | 'nodes' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
 
 export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }) {
@@ -102,6 +102,8 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         cmp = a.name.localeCompare(b.name, 'ko')
       } else if (sortKey === 'active') {
         cmp = Number(b.active) - Number(a.active)
+      } else if (sortKey === 'archived') {
+        cmp = Number(a.isArchived ?? false) - Number(b.isArchived ?? false)
       } else if (sortKey === 'nodes') {
         cmp = ((a.nodes as unknown[])?.length ?? 0) - ((b.nodes as unknown[])?.length ?? 0)
       } else if (sortKey === 'updatedAt') {
@@ -149,7 +151,12 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
               <TableHead className="text-muted-foreground">ID</TableHead>
               <TableHead>
                 <button onClick={() => handleSort('active')} className="flex items-center hover:text-foreground transition-colors">
-                  상태<SortIcon col="active" />
+                  Published<SortIcon col="active" />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button onClick={() => handleSort('archived')} className="flex items-center hover:text-foreground transition-colors">
+                  Archived<SortIcon col="archived" />
                 </button>
               </TableHead>
               <TableHead>
@@ -168,19 +175,19 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                   불러오는 중...
                 </TableCell>
               </TableRow>
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-destructive text-sm py-10">
+                <TableCell colSpan={7} className="text-center text-destructive text-sm py-10">
                   워크플로우를 불러오지 못했습니다.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                   워크플로우 없음
                 </TableCell>
               </TableRow>
@@ -200,8 +207,15 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                   <TableCell className="text-xs text-muted-foreground font-mono">{w.id}</TableCell>
                   <TableCell>
                     <Badge variant={w.active ? 'default' : 'secondary'}>
-                      {w.active ? '활성' : '비활성'}
+                      {w.active ? 'Yes' : 'No'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {w.isArchived ? (
+                      <Badge variant="outline">Archived</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
                   </TableCell>
                   <TableCell>{(w.nodes as unknown[])?.length ?? '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
