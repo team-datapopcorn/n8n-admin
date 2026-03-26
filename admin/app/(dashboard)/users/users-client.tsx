@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { ServerConfig, N8nUser } from '@/lib/types'
-import { UserPlus, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { UserPlus, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ArrowRightLeft } from 'lucide-react'
 import { useDemoMode } from '@/lib/demo-context'
 import { DEMO_USERS, DEMO_SERVER } from '@/lib/demo-data'
 
@@ -33,6 +34,9 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [showInvite, setShowInvite] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [transferUserId, setTransferUserId] = useState<string | null>(null)
+  const [transferUserEmail, setTransferUserEmail] = useState<string>('')
+  const [targetUserId, setTargetUserId] = useState<string>('')
   const qc = useQueryClient()
 
   const { data = [], isLoading, isError } = useQuery<N8nUser[]>({
@@ -71,6 +75,46 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
       setDeleteId(null)
     },
     onError: () => toast.error('삭제에 실패했습니다.'),
+  })
+
+  const { data: userAssets } = useQuery<{
+    projectId: string | null
+    workflows: { id: string; name: string; active: boolean }[]
+    credentials: { id: string; name: string; type: string }[]
+  }>({
+    queryKey: ['user-assets', server, transferUserId],
+    queryFn: () => fetch(`/api/servers/${server}/users/${transferUserId}/transfer`).then((r) => {
+      if (!r.ok) throw new Error(`${r.status}`)
+      return r.json()
+    }),
+    enabled: !!transferUserId && !isDemoMode,
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: async () => {
+      // Find target user's project ID
+      const targetAssets = await fetch(`/api/servers/${server}/users/${targetUserId}/transfer`).then(r => r.json())
+      const targetProjectId = targetAssets.projectId
+      if (!targetProjectId) throw new Error('인수자의 프로젝트를 찾을 수 없습니다')
+
+      const res = await fetch(`/api/servers/${server}/users/${transferUserId}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetProjectId,
+          workflowIds: userAssets?.workflows.map((w) => w.id) ?? [],
+          credentialIds: userAssets?.credentials.map((c) => c.id) ?? [],
+        }),
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
+      return res.json()
+    },
+    onSuccess: (data: { workflows: string[]; credentials: string[]; failed: { id: string; error: string }[] }) => {
+      toast.success(`워크플로우 ${data.workflows.length}개, 크레덴셜 ${data.credentials.length}개 이전 완료`)
+      setTransferUserId(null)
+      qc.invalidateQueries({ queryKey: ['users', server] })
+    },
+    onError: () => toast.error('인계에 실패했습니다'),
   })
 
   function toggleSort(key: SortKey) {
@@ -190,16 +234,32 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
                     </TableCell>
                     <TableCell className="text-right">
                       {!isProtected && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          disabled={isDemoMode}
-                          title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
-                          onClick={() => setDeleteId(u.id)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            disabled={isDemoMode}
+                            title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : '소유권 인계'}
+                            onClick={() => {
+                              setTransferUserId(u.id)
+                              setTransferUserEmail(u.email)
+                              setTargetUserId('')
+                            }}
+                          >
+                            <ArrowRightLeft size={14} />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={isDemoMode}
+                            title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                            onClick={() => setDeleteId(u.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>
@@ -228,6 +288,52 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
             >
               {inviteMutation.isPending ? '발송 중...' : '초대 이메일 발송'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 인계 다이얼로그 */}
+      <Dialog open={!!transferUserId} onOpenChange={() => setTransferUserId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>소유권 인계</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {transferUserEmail}의 자산을 다른 사용자에게 이전합니다.
+            </p>
+            {userAssets && (
+              <>
+                <div className="bg-muted rounded-md p-3 text-sm space-y-1">
+                  <p>워크플로우: {userAssets.workflows.length}개</p>
+                  <p>크레덴셜: {userAssets.credentials.length}개</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">인수자 선택</label>
+                  <Select value={targetUserId} onValueChange={setTargetUserId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="인수자를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {data
+                        .filter((u) => u.id !== transferUserId)
+                        .map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.email} ({u.firstName} {u.lastName})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => transferMutation.mutate()}
+                  disabled={!targetUserId || transferMutation.isPending || (userAssets.workflows.length === 0 && userAssets.credentials.length === 0)}
+                >
+                  {transferMutation.isPending ? '이전 중...' : '인계 실행'}
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
