@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# app config (contains API keys — never commit)
+.config/keys.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

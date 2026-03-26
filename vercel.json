@@ -2,5 +2,11 @@
   "buildCommand": "cd admin && pnpm build",
   "outputDirectory": "admin/.next",
   "installCommand": "cd admin && pnpm install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/auto-cleanup",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }

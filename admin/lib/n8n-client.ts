@@ -92,6 +92,20 @@ export async function deleteWorkflow(server: ServerConfig, id: string): Promise<
   if (!res.ok) throw new Error(`Failed to delete workflow: ${res.status}`)
 }
 
+export async function updateWorkflow(server: ServerConfig, id: string, workflow: N8nWorkflow): Promise<N8nWorkflow> {
+  const res = await fetch(`${server.url}/api/v1/workflows/${id}`, {
+    method: 'PUT',
+    headers: {
+      'X-N8N-API-KEY': server.apiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(workflow),
+  })
+  if (!res.ok) throw new Error(`Failed to update workflow: ${res.status}`)
+  return res.json()
+}
+
 export async function listUsers(server: ServerConfig): Promise<N8nUser[]> {
   const users = await fetchAllPages<N8nUser>(`${server.url}/api/v1/users`, server.apiKey)
   const now = Date.now()

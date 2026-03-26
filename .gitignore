@@ -26,3 +26,4 @@ dist/
 build/standalone/
 *.dmg
 build/icon.iconset/
+.vercel
