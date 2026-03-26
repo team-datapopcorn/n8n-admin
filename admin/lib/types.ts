@@ -77,3 +77,15 @@ export const MACHINE_TYPES = [
   { value: 'e2-standard-4', label: 'e2-standard-4', specs: '4 vCPU, 16GB RAM' },
   { value: 'n2-standard-2', label: 'n2-standard-2', specs: '2 vCPU, 8GB RAM' },
 ]
+
+export interface BatchErrorTriggerResult {
+  added: { id: string; name: string }[]
+  alreadyHas: { id: string; name: string }[]
+  failed: { id: string; name: string; error: string }[]
+}
+
+export interface TransferResult {
+  workflows: { id: string; name: string }[]
+  credentials: { id: string; name: string }[]
+  failed: { id: string; name: string; error: string }[]
+}

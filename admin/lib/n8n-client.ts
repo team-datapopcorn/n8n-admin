@@ -158,3 +158,41 @@ export async function deleteCredential(server: ServerConfig, id: string): Promis
   })
   if (!res.ok) throw new Error(`Failed to delete credential: ${res.status}`)
 }
+
+export async function transferWorkflowOwnership(
+  server: ServerConfig,
+  workflowId: string,
+  destinationProjectId: string,
+): Promise<void> {
+  const res = await fetch(`${server.url}/api/v1/workflows/${workflowId}/transfer`, {
+    method: 'PUT',
+    headers: {
+      'X-N8N-API-KEY': server.apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ destinationProjectId }),
+  })
+  if (!res.ok) throw new Error(`Failed to transfer workflow: ${res.status}`)
+}
+
+export async function transferCredentialOwnership(
+  server: ServerConfig,
+  credentialId: string,
+  destinationProjectId: string,
+): Promise<void> {
+  const res = await fetch(`${server.url}/api/v1/credentials/${credentialId}/transfer`, {
+    method: 'PUT',
+    headers: {
+      'X-N8N-API-KEY': server.apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ destinationProjectId }),
+  })
+  if (!res.ok) throw new Error(`Failed to transfer credential: ${res.status}`)
+}
+
+export function workflowHasErrorTrigger(workflow: N8nWorkflow): boolean {
+  return (workflow.nodes ?? []).some(
+    (node: unknown) => (node as { type?: string }).type === 'n8n-nodes-base.errorTrigger'
+  )
+}
