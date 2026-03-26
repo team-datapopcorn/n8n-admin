@@ -1,4 +1,5 @@
 import ServerHealthCard from '@/components/dashboard/server-health-card'
+import { DemoDashboard } from '@/components/dashboard/demo-dashboard'
 import { getServers } from '@/lib/server-config'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,7 @@ export default function DashboardPage() {
         <h2 className="text-2xl font-bold">대시보드</h2>
         <p className="text-muted-foreground text-sm mt-1">서버 상태 · 60초마다 자동 갱신</p>
       </div>
+      <DemoDashboard />
       {servers.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {process.env.ELECTRON_CONFIG_PATH

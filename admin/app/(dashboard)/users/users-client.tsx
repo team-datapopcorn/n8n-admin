@@ -12,6 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner'
 import { ServerConfig, N8nUser } from '@/lib/types'
 import { UserPlus, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { useDemoMode } from '@/lib/demo-context'
+import { DEMO_USERS, DEMO_SERVER } from '@/lib/demo-data'
 
 type SortKey = 'email' | 'role' | 'daysSinceActive'
 type SortDir = 'asc' | 'desc'
@@ -22,6 +24,8 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 }
 
 export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
+  const { isDemoMode } = useDemoMode()
+  const effectiveServers = isDemoMode ? [DEMO_SERVER] : servers
   const [server, setServer] = useState<string>(servers[0]?.id ?? '')
   const [dormantDays, setDormantDays] = useState(90)
   const [sortKey, setSortKey] = useState<SortKey>('daysSinceActive')
@@ -32,11 +36,14 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
   const qc = useQueryClient()
 
   const { data = [], isLoading, isError } = useQuery<N8nUser[]>({
-    queryKey: ['users', server],
-    queryFn: () => fetch(`/api/servers/${server}/users`).then((r) => {
-      if (!r.ok) throw new Error(`${r.status}`)
-      return r.json()
-    }),
+    queryKey: ['users', isDemoMode ? 'demo' : server],
+    queryFn: () => {
+      if (isDemoMode) return Promise.resolve(DEMO_USERS)
+      return fetch(`/api/servers/${server}/users`).then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`)
+        return r.json()
+      })
+    },
   })
 
   const inviteMutation = useMutation({
@@ -91,14 +98,19 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">유저 관리</h2>
-        <Button size="sm" onClick={() => setShowInvite(true)}>
+        <Button
+          size="sm"
+          disabled={isDemoMode}
+          title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+          onClick={() => setShowInvite(true)}
+        >
           <UserPlus size={14} className="mr-1" /> 초대
         </Button>
       </div>
 
-      <Tabs value={server} onValueChange={(v) => setServer(v)}>
+      <Tabs value={isDemoMode ? 'demo' : server} onValueChange={(v) => setServer(v)}>
         <TabsList>
-          {servers.map((s) => (
+          {effectiveServers.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>{s.name}</TabsTrigger>
           ))}
         </TabsList>
@@ -179,8 +191,11 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
                     <TableCell className="text-right">
                       {!isProtected && (
                         <Button
-                          size="icon" variant="ghost"
+                          size="icon"
+                          variant="ghost"
                           className="text-destructive hover:text-destructive"
+                          disabled={isDemoMode}
+                          title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
                           onClick={() => setDeleteId(u.id)}
                         >
                           <Trash2 size={14} />

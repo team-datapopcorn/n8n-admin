@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { ServerConfig, N8nWorkflow, N8nProject } from '@/lib/types'
 import { Copy, Trash2, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { useDemoMode } from '@/lib/demo-context'
+import { DEMO_WORKFLOWS, DEMO_SERVER } from '@/lib/demo-data'
 
 type SortKey = 'name' | 'active' | 'archived' | 'owner' | 'nodes' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
@@ -31,6 +33,8 @@ function getOwnerName(workflow: N8nWorkflow, projects: N8nProject[]): string {
 }
 
 export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }) {
+  const { isDemoMode } = useDemoMode()
+  const effectiveServers = isDemoMode ? [DEMO_SERVER] : servers
   const [server, setServer] = useState<string>(servers[0]?.id ?? '')
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
@@ -45,8 +49,9 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
 
   // Fetch ALL workflows (paginated internally)
   const { data: workflows = [], isLoading, isError } = useQuery<N8nWorkflow[]>({
-    queryKey: ['workflows-all', server],
+    queryKey: ['workflows-all', isDemoMode ? 'demo' : server],
     queryFn: async () => {
+      if (isDemoMode) return DEMO_WORKFLOWS
       const all: N8nWorkflow[] = []
       let cursor: string | undefined = undefined
       do {
@@ -157,9 +162,9 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">워크플로우</h2>
 
-      <Tabs value={server} onValueChange={(v) => { setServer(v); setFilterOwner(''); setFilterTag('') }}>
+      <Tabs value={isDemoMode ? 'demo' : server} onValueChange={(v) => { setServer(v); setFilterOwner(''); setFilterTag('') }}>
         <TabsList>
-          {servers.map((s) => (
+          {effectiveServers.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>{s.name}</TabsTrigger>
           ))}
         </TabsList>
@@ -328,11 +333,23 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                       <Button size="icon" variant="ghost" onClick={() => setViewWorkflow(w)}>
                         <Eye size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setCopyWorkflow(w)}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isDemoMode}
+                        title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                        onClick={() => setCopyWorkflow(w)}
+                      >
                         <Copy size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setDeleteId(w.id)}
-                        className="text-destructive hover:text-destructive">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isDemoMode}
+                        title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                        onClick={() => setDeleteId(w.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
                         <Trash2 size={14} />
                       </Button>
                     </div>
