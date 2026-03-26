@@ -1,0 +1,139 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.28.2
+
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install admin dependencies
+        run: cd admin && pnpm install --frozen-lockfile
+
+      - name: Build Next.js standalone
+        run: cd admin && pnpm build
+
+      - name: Prepare standalone
+        run: |
+          rm -rf build/standalone
+          mkdir -p build/standalone
+          rsync -aL --exclude='**/@img+sharp-*' --exclude='**/*.map' \
+            admin/.next/standalone/ build/standalone/
+          mkdir -p build/standalone/admin/.next
+          rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
+          rsync -aL admin/public/ build/standalone/admin/public/
+
+      - name: Hoist pnpm modules
+        run: |
+          NMDIR="build/standalone/admin/node_modules"
+          if [ -d "$NMDIR/.pnpm/node_modules" ]; then
+            for pkg in "$NMDIR/.pnpm/node_modules"/*; do
+              name=$(basename "$pkg")
+              if [[ "$name" == @* ]] && [ -d "$pkg" ]; then
+                mkdir -p "$NMDIR/$name"
+                for subpkg in "$pkg"/*; do
+                  subname=$(basename "$subpkg")
+                  [ ! -e "$NMDIR/$name/$subname" ] && [ -d "$subpkg" ] && cp -a "$subpkg" "$NMDIR/$name/$subname"
+                done
+              elif [ ! -e "$NMDIR/$name" ] && [ -d "$pkg" ]; then
+                cp -a "$pkg" "$NMDIR/$name"
+              fi
+            done
+          fi
+
+      - name: Compile Electron
+        run: npx tsc -p desktop/tsconfig.json
+
+      - name: Build DMG
+        run: npx electron-builder --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: dist/*.dmg
+
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.28.2
+
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install admin dependencies
+        run: cd admin && pnpm install --frozen-lockfile
+
+      - name: Build Next.js standalone
+        run: cd admin && pnpm build
+
+      - name: Prepare standalone
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force build/standalone -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path build/standalone -Force | Out-Null
+          Copy-Item -Recurse -Force admin/.next/standalone/* build/standalone/
+          New-Item -ItemType Directory -Path build/standalone/admin/.next -Force | Out-Null
+          Copy-Item -Recurse -Force admin/.next/static build/standalone/admin/.next/static
+          Copy-Item -Recurse -Force admin/public build/standalone/admin/public
+
+      - name: Generate Windows icon
+        shell: pwsh
+        run: |
+          if (-not (Test-Path build/icon.ico)) {
+            Copy-Item build/icon.iconset/icon_256x256.png build/icon.png
+            # electron-builder can use PNG as fallback on Windows
+          }
+
+      - name: Compile Electron
+        run: npx tsc -p desktop/tsconfig.json
+
+      - name: Build exe
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-exe
+          path: dist/*.exe
+
+  release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/mac-dmg/*.dmg
+            artifacts/win-exe/*.exe
+          generate_release_notes: true
