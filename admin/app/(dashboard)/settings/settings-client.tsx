@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, Plus, Play, CheckCircle, AlertCircle, Loader2, Save } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ElectronServer } from '@/lib/electron'
 
 interface CleanupResult {
@@ -258,6 +259,57 @@ export default function SettingsClient() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Claude Code 연결 ───────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Claude Code 연결</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Claude Code에서 자연어로 n8n을 관리할 수 있습니다.
+          </p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">1. Claude Code 설치</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-1 rounded text-xs flex-1 font-mono">
+                  npm install -g @anthropic-ai/claude-code
+                </code>
+                <Button variant="outline" size="sm" onClick={() => {
+                  navigator.clipboard.writeText('npm install -g @anthropic-ai/claude-code')
+                  toast.success('클립보드에 복사했습니다')
+                }}>
+                  복사
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">2. 프로젝트 폴더에서 실행</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-1 rounded text-xs flex-1 font-mono">
+                  cd n8n-admin && claude
+                </code>
+                <Button variant="outline" size="sm" onClick={() => {
+                  navigator.clipboard.writeText('cd n8n-admin && claude')
+                  toast.success('클립보드에 복사했습니다')
+                }}>
+                  복사
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">3. 사용 가능한 명령 예시</p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-1">
+                <li>• &quot;워크플로우 목록 보여줘&quot;</li>
+                <li>• &quot;Slack 알림 워크플로우 만들어줘&quot;</li>
+                <li>• &quot;전체 워크플로우 이름 정리해줘&quot;</li>
+                <li>• &quot;에러 리포트 보여줘&quot;</li>
+              </ul>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
