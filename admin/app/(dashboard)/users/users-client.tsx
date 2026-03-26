@@ -310,7 +310,7 @@ export default function UsersClient({ servers }: { servers: ServerConfig[] }) {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">인수자 선택</label>
-                  <Select value={targetUserId} onValueChange={setTargetUserId}>
+                  <Select value={targetUserId} onValueChange={(v) => setTargetUserId(v ?? '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="인수자를 선택하세요" />
                     </SelectTrigger>
