@@ -43,6 +43,27 @@ export function getServers(): ServerConfig[] {
     i++
   }
 
+  if (servers.length > 0) return servers
+
+  // 폴백: CLOUD_URL / GCP_URL / RAILWAY_URL 명명 규칙 지원
+  const namedEnvs: { key: string; id: string; name: string; description: string }[] = [
+    { key: 'CLOUD', id: 'cloud', name: 'Cloud', description: '' },
+    { key: 'GCP', id: 'gcp-vm', name: 'GCP VM', description: '' },
+    { key: 'RAILWAY', id: 'railway', name: 'Railway', description: '' },
+  ]
+  for (const s of namedEnvs) {
+    const url = process.env[`${s.key}_URL`]
+    if (url) {
+      servers.push({
+        id: s.id,
+        name: process.env[`${s.key}_NAME`] ?? s.name,
+        url,
+        apiKey: process.env[`${s.key}_API_KEY`] ?? '',
+        description: process.env[`${s.key}_DESCRIPTION`] ?? s.description,
+      })
+    }
+  }
+
   return servers
 }
 
