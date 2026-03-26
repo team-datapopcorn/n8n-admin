@@ -32,6 +32,12 @@ function getOwnerName(workflow: N8nWorkflow, projects: N8nProject[]): string {
   return project.name
 }
 
+function hasErrorTrigger(wf: N8nWorkflow): boolean {
+  return (wf.nodes ?? []).some(
+    (node: unknown) => (node as { type?: string }).type === 'n8n-nodes-base.errorTrigger'
+  )
+}
+
 export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }) {
   const { isDemoMode } = useDemoMode()
   const effectiveServers = isDemoMode ? [DEMO_SERVER] : servers
@@ -98,6 +104,26 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
       setCopyWorkflow(null)
     },
     onError: () => toast.error('복사에 실패했습니다.'),
+  })
+
+  const batchErrorTriggerMutation = useMutation({
+    mutationFn: async () => {
+      const missing = workflows
+        .filter((wf) => wf.active && !hasErrorTrigger(wf))
+        .map((wf) => wf.id)
+      const res = await fetch(`/api/servers/${server}/workflows/batch-error-triggers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflowIds: missing }),
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
+      return res.json()
+    },
+    onSuccess: (data: { added: string[]; failed: { id: string; error: string }[] }) => {
+      toast.success(`에러 트리거 ${data.added.length}개 등록 완료`)
+      qc.invalidateQueries({ queryKey: ['workflows-all', server] })
+    },
+    onError: () => toast.error('일괄 등록에 실패했습니다'),
   })
 
   // Extract unique owners and tags for filter dropdowns
@@ -228,6 +254,25 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         </span>
       </div>
 
+      {(() => {
+        const missingErrorTriggerCount = workflows.filter((wf) => wf.active && !hasErrorTrigger(wf)).length
+        return missingErrorTriggerCount > 0 && !isDemoMode ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-sm text-orange-800">
+              에러 트리거 없는 활성 워크플로우: {missingErrorTriggerCount}개
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => batchErrorTriggerMutation.mutate()}
+              disabled={batchErrorTriggerMutation.isPending}
+            >
+              {batchErrorTriggerMutation.isPending ? '등록 중...' : '일괄 등록'}
+            </Button>
+          </div>
+        ) : null
+      })()}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -264,25 +309,26 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                   수정일<SortIcon col="updatedAt" />
                 </button>
               </TableHead>
+              <TableHead>에러 트리거</TableHead>
               <TableHead className="text-right">액션</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   전체 워크플로우 불러오는 중...
                 </TableCell>
               </TableRow>
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-destructive text-sm py-10">
+                <TableCell colSpan={10} className="text-center text-destructive text-sm py-10">
                   워크플로우를 불러오지 못했습니다.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   워크플로우 없음
                 </TableCell>
               </TableRow>
@@ -327,6 +373,15 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                   <TableCell>{(w.nodes as unknown[])?.length ?? '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(w.updatedAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
+                  </TableCell>
+                  <TableCell>
+                    {hasErrorTrigger(w) ? (
+                      <Badge variant="outline" className="text-green-600 border-green-300">있음</Badge>
+                    ) : w.active ? (
+                      <Badge variant="outline" className="text-red-600 border-red-300">없음</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
