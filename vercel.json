@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd admin && pnpm build",
+  "buildCommand": "cd admin && pnpm run build",
   "outputDirectory": "admin/.next",
-  "installCommand": "cd admin && pnpm install",
+  "installCommand": "npm install -g pnpm@10.28.2 && cd admin && pnpm install",
   "framework": "nextjs",
   "crons": [
     {
