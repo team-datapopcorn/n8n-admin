@@ -5,6 +5,9 @@
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "main": "desktop/dist/main.js",
+  "dependencies": {
+    "next": "16.1.6"
+  },
   "scripts": {
     "desktop:build": "./scripts/build-desktop.sh",
     "desktop:dev": "npx tsc -p desktop/tsconfig.json && electron .",
