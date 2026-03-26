@@ -128,8 +128,156 @@ GCP VM에 n8n을 올린 경우 VM을 직접 제어할 수 있습니다.
 
 ---
 
+## Claude Code — AI로 n8n 관리하기
+
+이 레포에는 [Claude Code](https://claude.ai/claude-code)용 **n8n 스킬**이 포함되어 있습니다. 자연어로 워크플로우를 만들고, 실패를 디버깅하고, 교육 콘텐츠를 생성할 수 있습니다.
+
+### 사전 준비
+
+1. **Claude Code** 설치 ([공식 문서](https://docs.anthropic.com/en/docs/claude-code/overview))
+2. **n8n MCP 서버** 연결 — Claude Code 설정에 n8n-cloud MCP 서버를 추가합니다:
+
+```json
+// .claude/settings.json 또는 ~/.claude/settings.json
+{
+  "mcpServers": {
+    "n8n-cloud": {
+      "type": "url",
+      "url": "https://your-n8n-mcp-endpoint"
+    }
+  }
+}
+```
+
+> n8n MCP 서버 설정 방법은 [n8n 공식 문서](https://docs.n8n.io)를 참고하세요.
+
+### 스킬 구조
+
+```
+.claude/skills/n8n/
+├── SKILL.md                          # 메인 스킬 (모듈 라우팅, 공통 규칙, 도구 목록)
+└── references/
+    ├── workflow-builder.md           # 워크플로우 생성/수정/분석
+    ├── ops-manager.md                # 모니터링/디버깅/실행 관리
+    └── teaching-guide.md             # 튜토리얼/강의자료/실습 생성
+```
+
+### 사용법
+
+이 레포 디렉토리에서 Claude Code를 실행하면 n8n 스킬이 자동으로 로드됩니다.
+
+```bash
+cd n8n-admin
+claude
+```
+
+#### 워크플로우 생성
+
+자연어로 원하는 워크플로우를 설명하면 Claude가 6단계 프로세스로 생성합니다.
+
+```
+> 매일 아침 9시에 기상청 API에서 날씨를 가져와서 Slack에 보내줘
+> GitHub 이슈가 생기면 Notion 데이터베이스에 자동 추가하는 워크플로우 만들어
+> 웹훅으로 주문 데이터를 받아서 Google Sheets에 기록해줘
+```
+
+**내부 동작:**
+1. 요청 분석 → 필요한 노드 식별
+2. `search_nodes` → `get_node`로 노드 스펙 확인
+3. 워크플로우 JSON 구성 (노드, 연결, 설정)
+4. `validate_workflow`로 사전 검증
+5. `n8n_create_workflow`로 생성 + `n8n_test_workflow`로 테스트
+6. 결과 보고 (워크플로우 ID, 노드 구성, 테스트 결과)
+
+#### 운영 모니터링 & 디버깅
+
+실행 현황을 확인하거나 실패 원인을 분석합니다.
+
+```
+> n8n 워크플로우 전체 현황 보여줘
+> 최근 실패한 워크플로우 원인 분석해줘
+> 워크플로우 ID:123이 자꾸 실패하는데 왜 그런지 알아봐줘
+```
+
+**디버깅 프로세스:**
+1. `n8n_executions`로 실패 이력 조회
+2. 에러 메시지와 실패 노드 식별
+3. 원인 분류 (연결/데이터/로직/리소스 에러)
+4. `n8n_autofix_workflow`로 자동 수정 시도
+5. 자동 수정 실패 시 수동 수정안 제시
+6. 수정 실패 시 `n8n_workflow_versions`로 롤백
+
+#### 기존 워크플로우 분석 & 개선
+
+이미 만들어진 워크플로우를 점검하고 개선합니다.
+
+```
+> 워크플로우 ID:456 분석해줘
+> 에러 핸들링이 없는 워크플로우 찾아서 추가해줘
+> 이 워크플로우 성능 개선할 수 있어?
+```
+
+**점검 항목:** 에러 핸들링 누락, 중복 노드, 비효율적 데이터 처리, 하드코딩된 값
+
+#### 교육 콘텐츠 생성
+
+n8n 튜토리얼, 실습 자료, 강의 슬라이드를 만듭니다.
+
+```
+> HTTP Request 노드 심화 튜토리얼 만들어줘
+> 에러 핸들링 패턴 실습 워크플로우 만들어줘 (실제 n8n에 생성)
+> 웹훅 활용법 강의 슬라이드 만들어줘
+```
+
+**3가지 출력 형태:**
+| 형태 | 설명 |
+|------|------|
+| 마크다운 튜토리얼 | 개요→핵심개념→단계별구현→응용패턴 구조의 문서 |
+| 실습형 | 실제 n8n에 워크플로우를 점진적으로 생성하며 학습 |
+| 강의 슬라이드 | 본문 + 발표자 노트 형식의 슬라이드 구성 |
+
+### MCP 도구 전체 목록 (21개)
+
+<details>
+<summary>펼쳐보기</summary>
+
+| 카테고리 | 도구 | 용도 |
+|----------|------|------|
+| **생명주기** | `n8n_health_check` | 인스턴스 상태 확인 |
+| | `n8n_create_workflow` | 워크플로우 생성 |
+| | `n8n_get_workflow` | 워크플로우 상세 조회 |
+| | `n8n_list_workflows` | 전체 목록 조회 |
+| | `n8n_update_full_workflow` | 전체 업데이트 |
+| | `n8n_update_partial_workflow` | 부분 패치 |
+| | `n8n_delete_workflow` | 삭제 |
+| | `n8n_workflow_versions` | 버전 이력/롤백 |
+| **검증/테스트** | `validate_workflow` | JSON 사전 검증 |
+| | `n8n_validate_workflow` | ID 기반 사후 검증 |
+| | `validate_node` | 개별 노드 검증 |
+| | `n8n_autofix_workflow` | 자동 수정 |
+| | `n8n_test_workflow` | 테스트 실행 |
+| **실행/데이터** | `n8n_executions` | 실행 이력 조회 |
+| | `n8n_manage_datatable` | 데이터 테이블 관리 |
+| **노드/템플릿** | `search_nodes` | 노드 검색 |
+| | `get_node` | 노드 상세 정보 |
+| | `search_templates` | 템플릿 검색 |
+| | `get_template` | 템플릿 상세 정보 |
+| | `n8n_deploy_template` | 템플릿 배포 |
+| **참조** | `tools_documentation` | 도구 문서 조회 |
+
+</details>
+
+### 안전 원칙
+
+- 삭제, 전체 업데이트 등 **파괴적 작업은 항상 사용자 확인 후** 실행
+- 수정 전 `n8n_workflow_versions`로 현재 버전 확인 → 실패 시 즉시 롤백
+- `n8n_test_workflow`는 **webhook/form/chat 트리거만** 지원 (스케줄 트리거는 n8n UI에서 수동 테스트)
+
+---
+
 ## 요구사항
 
 - **Desktop App:** macOS (Apple Silicon)
 - **Shell Scripts:** bash, jq
 - **Admin 대시보드 (직접 빌드):** Node.js 20+, pnpm
+- **Claude Code 스킬:** [Claude Code](https://claude.ai/claude-code) + n8n MCP 서버 연결
