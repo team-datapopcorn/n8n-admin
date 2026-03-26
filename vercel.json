@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd admin && pnpm run build",
+  "buildCommand": "cd admin && npx pnpm@10.28.2 run build",
   "outputDirectory": "admin/.next",
-  "installCommand": "npm install -g pnpm@10.28.2 && cd admin && pnpm install",
+  "installCommand": "cd admin && npx --yes pnpm@10.28.2 install --no-frozen-lockfile",
   "framework": "nextjs",
   "crons": [
     {
