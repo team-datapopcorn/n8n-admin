@@ -136,4 +136,28 @@ jobs:
           files: |
             artifacts/mac-dmg/*.dmg
             artifacts/win-exe/*.exe
-          generate_release_notes: true
+          body: |
+            ## 다운로드
+
+            | 플랫폼 | 파일 | 설명 |
+            |--------|------|------|
+            | **macOS** (Apple Silicon) | `n8n-Admin-*-mac-arm64.dmg` | DMG 설치 파일 |
+            | **Windows** (x64) | `n8n-Admin-*-win-x64.exe` | NSIS 설치 파일 |
+
+            ## 설치 방법
+
+            ### macOS
+            1. `.dmg` 파일 다운로드 → 더블클릭 → Applications 폴더에 드래그
+            2. 앱 실행 → 설정 위자드에서 n8n URL + API 키 입력
+
+            ### Windows
+            1. `.exe` 파일 다운로드 → 실행 (SmartScreen 경고 시 "추가 정보" → "실행")
+            2. 설치 완료 → 앱 실행 → 설정 위자드에서 n8n URL + API 키 입력
+
+            ### GitHub 클론 (개발자)
+            ```bash
+            git clone https://github.com/team-datapopcorn/n8n-admin.git
+            cd n8n-admin
+            ./setup.sh        # macOS/Linux
+            .\setup.ps1       # Windows PowerShell
+            ```
