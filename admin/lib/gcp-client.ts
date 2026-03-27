@@ -8,9 +8,9 @@ function getClient() {
   return new InstancesClient({ credentials })
 }
 
-const PROJECT = process.env.GCP_PROJECT_ID!.trim()
-const ZONE = process.env.GCP_ZONE!.trim()
-const INSTANCE = process.env.GCP_INSTANCE_NAME!.trim()
+const PROJECT = (process.env.GCP_PROJECT_ID ?? '').trim()
+const ZONE = (process.env.GCP_ZONE ?? '').trim()
+const INSTANCE = (process.env.GCP_INSTANCE_NAME ?? '').trim()
 
 export async function getVmStatus(): Promise<GcpVmStatus> {
   const client = getClient()

@@ -12,8 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { ServerConfig, N8nCredential } from '@/lib/types'
 import { Trash2, GitCompare } from 'lucide-react'
+import { useDemoMode } from '@/lib/demo-context'
+import { DEMO_CREDENTIALS, DEMO_SERVER } from '@/lib/demo-data'
 
 export default function CredentialsClient({ servers }: { servers: ServerConfig[] }) {
+  const { isDemoMode } = useDemoMode()
+  const effectiveServers = isDemoMode ? [DEMO_SERVER] : servers
   const [server, setServer] = useState<string>(servers[0]?.id ?? '')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showChecklist, setShowChecklist] = useState(false)
@@ -22,11 +26,14 @@ export default function CredentialsClient({ servers }: { servers: ServerConfig[]
   const qc = useQueryClient()
 
   const { data = [], isLoading, isError } = useQuery<N8nCredential[]>({
-    queryKey: ['credentials', server],
-    queryFn: () => fetch(`/api/servers/${server}/credentials`).then((r) => {
-      if (!r.ok) throw new Error(`${r.status}`)
-      return r.json()
-    }),
+    queryKey: ['credentials', isDemoMode ? 'demo' : server],
+    queryFn: () => {
+      if (isDemoMode) return Promise.resolve(DEMO_CREDENTIALS)
+      return fetch(`/api/servers/${server}/credentials`).then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`)
+        return r.json()
+      })
+    },
   })
 
   const deleteMutation = useMutation({
@@ -67,9 +74,9 @@ export default function CredentialsClient({ servers }: { servers: ServerConfig[]
         </Button>
       </div>
 
-      <Tabs value={server} onValueChange={(v) => setServer(v)}>
+      <Tabs value={isDemoMode ? 'demo' : server} onValueChange={(v) => setServer(v)}>
         <TabsList>
-          {servers.map((s) => (
+          {effectiveServers.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>{s.name}</TabsTrigger>
           ))}
         </TabsList>
@@ -101,7 +108,14 @@ export default function CredentialsClient({ servers }: { servers: ServerConfig[]
                   <TableCell className="text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('ko-KR')}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{new Date(c.updatedAt).toLocaleDateString('ko-KR')}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      disabled={isDemoMode}
+                      title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                      onClick={() => setDeleteId(c.id)}
+                    >
                       <Trash2 size={14} />
                     </Button>
                   </TableCell>

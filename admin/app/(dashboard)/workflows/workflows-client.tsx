@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { ServerConfig, N8nWorkflow, N8nProject } from '@/lib/types'
 import { Copy, Trash2, Eye, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { useDemoMode } from '@/lib/demo-context'
+import { DEMO_WORKFLOWS, DEMO_SERVER } from '@/lib/demo-data'
 
 type SortKey = 'name' | 'active' | 'archived' | 'owner' | 'nodes' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
@@ -30,7 +32,15 @@ function getOwnerName(workflow: N8nWorkflow, projects: N8nProject[]): string {
   return project.name
 }
 
+function hasErrorTrigger(wf: N8nWorkflow): boolean {
+  return (wf.nodes ?? []).some(
+    (node: unknown) => (node as { type?: string }).type === 'n8n-nodes-base.errorTrigger'
+  )
+}
+
 export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }) {
+  const { isDemoMode } = useDemoMode()
+  const effectiveServers = isDemoMode ? [DEMO_SERVER] : servers
   const [server, setServer] = useState<string>(servers[0]?.id ?? '')
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
@@ -45,8 +55,9 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
 
   // Fetch ALL workflows (paginated internally)
   const { data: workflows = [], isLoading, isError } = useQuery<N8nWorkflow[]>({
-    queryKey: ['workflows-all', server],
+    queryKey: ['workflows-all', isDemoMode ? 'demo' : server],
     queryFn: async () => {
+      if (isDemoMode) return DEMO_WORKFLOWS
       const all: N8nWorkflow[] = []
       let cursor: string | undefined = undefined
       do {
@@ -93,6 +104,26 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
       setCopyWorkflow(null)
     },
     onError: () => toast.error('복사에 실패했습니다.'),
+  })
+
+  const batchErrorTriggerMutation = useMutation({
+    mutationFn: async () => {
+      const missing = workflows
+        .filter((wf) => wf.active && !hasErrorTrigger(wf))
+        .map((wf) => wf.id)
+      const res = await fetch(`/api/servers/${server}/workflows/batch-error-triggers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflowIds: missing }),
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
+      return res.json()
+    },
+    onSuccess: (data: { added: string[]; failed: { id: string; error: string }[] }) => {
+      toast.success(`에러 트리거 ${data.added.length}개 등록 완료`)
+      qc.invalidateQueries({ queryKey: ['workflows-all', server] })
+    },
+    onError: () => toast.error('일괄 등록에 실패했습니다'),
   })
 
   // Extract unique owners and tags for filter dropdowns
@@ -157,9 +188,9 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">워크플로우</h2>
 
-      <Tabs value={server} onValueChange={(v) => { setServer(v); setFilterOwner(''); setFilterTag('') }}>
+      <Tabs value={isDemoMode ? 'demo' : server} onValueChange={(v) => { setServer(v); setFilterOwner(''); setFilterTag('') }}>
         <TabsList>
-          {servers.map((s) => (
+          {effectiveServers.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>{s.name}</TabsTrigger>
           ))}
         </TabsList>
@@ -223,6 +254,25 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
         </span>
       </div>
 
+      {(() => {
+        const missingErrorTriggerCount = workflows.filter((wf) => wf.active && !hasErrorTrigger(wf)).length
+        return missingErrorTriggerCount > 0 && !isDemoMode ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-sm text-orange-800">
+              에러 트리거 없는 활성 워크플로우: {missingErrorTriggerCount}개
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => batchErrorTriggerMutation.mutate()}
+              disabled={batchErrorTriggerMutation.isPending}
+            >
+              {batchErrorTriggerMutation.isPending ? '등록 중...' : '일괄 등록'}
+            </Button>
+          </div>
+        ) : null
+      })()}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -259,25 +309,26 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                   수정일<SortIcon col="updatedAt" />
                 </button>
               </TableHead>
+              <TableHead>에러 트리거</TableHead>
               <TableHead className="text-right">액션</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   전체 워크플로우 불러오는 중...
                 </TableCell>
               </TableRow>
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-destructive text-sm py-10">
+                <TableCell colSpan={10} className="text-center text-destructive text-sm py-10">
                   워크플로우를 불러오지 못했습니다.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   워크플로우 없음
                 </TableCell>
               </TableRow>
@@ -323,16 +374,37 @@ export default function WorkflowsClient({ servers }: { servers: ServerConfig[] }
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(w.updatedAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
                   </TableCell>
+                  <TableCell>
+                    {hasErrorTrigger(w) ? (
+                      <Badge variant="outline" className="text-green-600 border-green-300">있음</Badge>
+                    ) : w.active ? (
+                      <Badge variant="outline" className="text-red-600 border-red-300">없음</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button size="icon" variant="ghost" onClick={() => setViewWorkflow(w)}>
                         <Eye size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setCopyWorkflow(w)}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isDemoMode}
+                        title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                        onClick={() => setCopyWorkflow(w)}
+                      >
                         <Copy size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setDeleteId(w.id)}
-                        className="text-destructive hover:text-destructive">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isDemoMode}
+                        title={isDemoMode ? '데모 모드에서는 사용할 수 없습니다' : undefined}
+                        onClick={() => setDeleteId(w.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
                         <Trash2 size={14} />
                       </Button>
                     </div>

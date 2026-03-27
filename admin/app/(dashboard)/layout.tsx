@@ -1,4 +1,6 @@
 import Sidebar from '@/components/layout/sidebar'
+import { DemoProvider } from '@/lib/demo-context'
+import { DemoBanner } from '@/components/demo-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,12 +11,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const showSettings = !!process.env.ELECTRON_CONFIG_PATH
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar showGcp={showGcp} showSettings={showSettings} />
-      <main className="flex-1 overflow-auto">
-        <div className="h-8 [-webkit-app-region:drag]" />
-        <div className="px-6 pb-6">{children}</div>
-      </main>
-    </div>
+    <DemoProvider>
+      <div className="flex min-h-screen">
+        <Sidebar showGcp={showGcp} showSettings={showSettings} />
+        <main className="flex-1 overflow-auto">
+          <div className="h-8 [-webkit-app-region:drag]" />
+          <DemoBanner />
+          <div className="px-6 pb-6">{children}</div>
+        </main>
+      </div>
+    </DemoProvider>
   )
 }

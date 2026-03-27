@@ -1,6 +1,6 @@
 #!/bin/bash
 # n8n Admin Desktop 빌드 스크립트
-# 사용법: ./scripts/build-desktop.sh
+# 사용법: ./scripts/build-desktop.sh [mac|win|all|auto]
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -53,9 +53,32 @@ fi
 echo "=== 3/4: Electron 코드 컴파일 ==="
 npx tsc -p desktop/tsconfig.json
 
-echo "=== 4/4: Electron 앱 빌드 (DMG) ==="
-npx electron-builder --mac
+PLATFORM="${1:-auto}"
 
-echo ""
-echo "빌드 완료! DMG 파일:"
-ls -la dist/*.dmg
+echo "=== 4/4: Electron 앱 빌드 ($PLATFORM) ==="
+case "$PLATFORM" in
+  mac)
+    npx electron-builder --mac
+    echo ""; echo "빌드 완료!"; ls -la dist/*.dmg 2>/dev/null
+    ;;
+  win)
+    npx electron-builder --win
+    echo ""; echo "빌드 완료!"; ls -la dist/*.exe 2>/dev/null
+    ;;
+  all)
+    npx electron-builder --mac --win
+    echo ""; echo "빌드 완료!"; ls -la dist/*.dmg dist/*.exe 2>/dev/null
+    ;;
+  auto)
+    if [[ "$(uname)" == "Darwin" ]]; then
+      npx electron-builder --mac
+      echo ""; echo "빌드 완료!"; ls -la dist/*.dmg 2>/dev/null
+    else
+      npx electron-builder --win
+      echo ""; echo "빌드 완료!"; ls -la dist/*.exe 2>/dev/null
+    fi
+    ;;
+  *)
+    echo "사용법: $0 [mac|win|all|auto]"; exit 1
+    ;;
+esac
