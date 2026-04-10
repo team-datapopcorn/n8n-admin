@@ -1,5 +1,55 @@
 import fs from 'fs'
-import { ServerConfig } from './types'
+import { ServerConfig, HostingConfig, HostingType } from './types'
+
+/**
+ * 환경변수에서 호스팅 설정을 읽습니다.
+ *
+ * 예시:
+ *   SERVER_HOSTING=gcp
+ *   SERVER_GCP_PROJECT_ID=my-project
+ *   SERVER_GCP_ZONE=asia-northeast3-a
+ *   SERVER_GCP_INSTANCE_NAME=n8n-vm
+ *   SERVER_GCP_SERVICE_ACCOUNT_KEY=base64...
+ *
+ * 글로벌 GCP 환경변수 폴백:
+ *   GCP_PROJECT_ID, GCP_ZONE, GCP_INSTANCE_NAME, GCP_SERVICE_ACCOUNT_KEY
+ */
+function readHostingConfig(prefix: string): HostingConfig | undefined {
+  const type = (process.env[`${prefix}_HOSTING`] ?? '').toLowerCase() as HostingType
+
+  if (type && type !== 'none') {
+    const providerPrefix = `${prefix}_${type.toUpperCase().replace('-', '_')}_`
+    const params: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith(providerPrefix) && value) {
+        const paramKey = key
+          .slice(providerPrefix.length)
+          .toLowerCase()
+          .replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+        params[paramKey] = value
+      }
+    }
+
+    return { type, params }
+  }
+
+  return undefined
+}
+
+/**
+ * 글로벌 GCP 환경변수(GCP_PROJECT_ID 등)로 GCP 호스팅 설정을 생성합니다.
+ * 기존 .env 호환용 — named env 모드의 GCP 서버에만 적용됩니다.
+ */
+function readGlobalGcpHosting(): HostingConfig | undefined {
+  if (!process.env.GCP_PROJECT_ID) return undefined
+  const params: Record<string, string> = {}
+  if (process.env.GCP_PROJECT_ID) params.projectId = process.env.GCP_PROJECT_ID
+  if (process.env.GCP_ZONE) params.zone = process.env.GCP_ZONE
+  if (process.env.GCP_INSTANCE_NAME) params.instanceName = process.env.GCP_INSTANCE_NAME
+  if (process.env.GCP_SERVICE_ACCOUNT_KEY) params.serviceAccountKey = process.env.GCP_SERVICE_ACCOUNT_KEY
+  return { type: 'gcp', params }
+}
 
 /**
  * .env 또는 JSON 파일에서 서버 목록을 읽어 반환합니다.
@@ -39,6 +89,7 @@ export function getServers(): ServerConfig[] {
       url,
       apiKey: process.env[`${prefix}_API_KEY`] ?? '',
       description: process.env[`${prefix}_DESCRIPTION`],
+      hosting: readHostingConfig(prefix),
     })
     i++
   }
@@ -54,12 +105,16 @@ export function getServers(): ServerConfig[] {
   for (const s of namedEnvs) {
     const url = process.env[`${s.key}_URL`]
     if (url) {
+      // 명시적 호스팅 설정 우선, GCP 서버에만 글로벌 GCP 폴백 적용
+      const hosting = readHostingConfig(s.key)
+        ?? (s.key === 'GCP' ? readGlobalGcpHosting() : undefined)
       servers.push({
         id: s.id,
         name: process.env[`${s.key}_NAME`] ?? s.name,
         url,
         apiKey: process.env[`${s.key}_API_KEY`] ?? '',
         description: process.env[`${s.key}_DESCRIPTION`] ?? s.description,
+        hosting,
       })
     }
   }

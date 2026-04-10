@@ -16,11 +16,12 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}))
   const serverId: string = body.serverId ?? 'server1'
+  const dryRun: boolean = body.dryRun ?? false
 
   try {
     const server = getServer(serverId)
-    const result = await runAutoCleanup(server, geminiApiKey)
-    return NextResponse.json({ ok: true, serverId, ...result })
+    const result = await runAutoCleanup(server, geminiApiKey, dryRun)
+    return NextResponse.json({ ok: true, serverId, dryRun, ...result })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

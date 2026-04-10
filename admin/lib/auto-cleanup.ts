@@ -10,6 +10,7 @@
 
 import { ServerConfig, N8nWorkflow, N8nCredential } from './types'
 import { listWorkflows, getWorkflow, updateWorkflow, listCredentials } from './n8n-client'
+import { validateName } from './naming-convention'
 
 // ─── 이름 분류 함수 ──────────────────────────────────────────────
 
@@ -86,13 +87,15 @@ export interface CleanupResult {
   skipped: { id: string; name: string; reason: string }[]
   credentialWarnings: { id: string; name: string; type: string }[]
   errors: { id: string; name: string; error: string }[]
+  conventionViolations: { id: string; name: string; issues: string[] }[]
 }
 
 export async function runAutoCleanup(
   server: ServerConfig,
   geminiApiKey: string,
+  dryRun = false,
 ): Promise<CleanupResult> {
-  const result: CleanupResult = { renamed: [], skipped: [], credentialWarnings: [], errors: [] }
+  const result: CleanupResult = { renamed: [], skipped: [], credentialWarnings: [], errors: [], conventionViolations: [] }
 
   // 1. 전체 워크플로우 + 크레덴셜 가져오기
   const [workflows, credentials] = await Promise.all([
@@ -139,8 +142,12 @@ export async function runAutoCleanup(
 
       const newName = await askGemini(geminiApiKey, nodeTypes, wf.name)
 
-      await updateWorkflow(server, wf.id, { ...fullWf, name: newName })
-      result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'ai' })
+      if (dryRun) {
+        result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'ai' })
+      } else {
+        await updateWorkflow(server, wf.id, { ...fullWf, name: newName })
+        result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'ai' })
+      }
     } catch (err) {
       result.errors.push({ id: wf.id, name: wf.name, error: String(err) })
     }
@@ -149,11 +156,25 @@ export async function runAutoCleanup(
   // 5. [B] 정규화 (복사/버전 마커 제거)
   for (const { wf, newName } of normalizeCandidates) {
     try {
-      const fullWf = await getWorkflow(server, wf.id)
-      await updateWorkflow(server, wf.id, { ...fullWf, name: newName })
-      result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'normalize' })
+      if (dryRun) {
+        result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'normalize' })
+      } else {
+        const fullWf = await getWorkflow(server, wf.id)
+        await updateWorkflow(server, wf.id, { ...fullWf, name: newName })
+        result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'normalize' })
+      }
     } catch (err) {
       result.errors.push({ id: wf.id, name: wf.name, error: String(err) })
+    }
+  }
+
+  // 6. 컨벤션 검사 — 모든 워크플로우(변경된 이름 포함)에 대해 검사
+  const renamedMap = new Map(result.renamed.map((r) => [r.id, r.newName]))
+  for (const wf of workflows as N8nWorkflow[]) {
+    const currentName = renamedMap.get(wf.id) ?? wf.name
+    const validation = validateName(currentName)
+    if (!validation.valid) {
+      result.conventionViolations.push({ id: wf.id, name: currentName, issues: validation.issues })
     }
   }
 

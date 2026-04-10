@@ -1,11 +1,20 @@
 export type ServerId = string
 
+export type HostingType = 'gcp' | 'aws' | 'railway' | 'hostinger' | 'none'
+
+export interface HostingConfig {
+  type: HostingType
+  /** Provider별 설정값 (환경변수에서 읽은 key-value) */
+  params: Record<string, string>
+}
+
 export interface ServerConfig {
   id: ServerId
   name: string
   url: string
   apiKey: string
   description?: string
+  hosting?: HostingConfig
 }
 
 export interface N8nWorkflow {
@@ -57,6 +66,15 @@ export interface ServerHealth {
   userCount?: number
   latencyMs?: number
   error?: string
+}
+
+export interface N8nExecution {
+  id: string
+  workflowId: string
+  status: 'success' | 'error' | 'waiting' | 'running'
+  startedAt: string
+  stoppedAt?: string
+  data?: unknown
 }
 
 export interface GcpVmStatus {

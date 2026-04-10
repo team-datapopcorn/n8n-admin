@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { LayoutDashboard, Workflow, Users, Key, Server, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Workflow, Users, Key, Server, Settings, LogOut, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -14,18 +14,20 @@ const BASE_NAV = [
   { href: '/credentials', label: '크레덴셜',   icon: Key },
 ]
 
-const GCP_NAV = { href: '/gcp', label: 'GCP VM', icon: Server }
+const SCHEDULE_NAV = { href: '/schedule', label: '스케줄', icon: Calendar }
+const HOSTING_NAV = { href: '/hosting', label: '인프라', icon: Server }
+
+const SETTINGS_NAV = { href: '/settings', label: '설정', icon: Settings }
 
 interface SidebarProps {
-  showGcp: boolean
-  showSettings?: boolean
+  showHosting: boolean
 }
 
-export default function Sidebar({ showGcp, showSettings }: SidebarProps) {
+export default function Sidebar({ showHosting }: SidebarProps) {
   const pathname = usePathname()
-  const nav = [...BASE_NAV]
-  if (showGcp) nav.push(GCP_NAV)
-  if (showSettings) nav.push({ href: '/settings', label: '설정', icon: Settings })
+  const nav = [...BASE_NAV, SCHEDULE_NAV]
+  if (showHosting) nav.push(HOSTING_NAV)
+  nav.push(SETTINGS_NAV)
 
   return (
     <aside className="flex flex-col w-56 min-h-screen border-r bg-background px-3 py-4">

@@ -3,11 +3,32 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, Plus, Play, CheckCircle, AlertCircle, Loader2, Save } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Trash2, Plus, Play, CheckCircle, AlertCircle, Loader2, Save,
+  Key, Clock, Bell, Shield, Sparkles, Server,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import type { ElectronServer } from '@/lib/electron'
+
+// ─── 타입 ──────────────────────────────────────────────────────
+
+interface ConfigState {
+  geminiConfigured: boolean
+  geminiSource: 'env' | 'config' | null
+  cronSecretConfigured: boolean
+  cronSecretSource: 'env' | 'config' | null
+  slackConfigured: boolean
+  slackSource: 'env' | 'config' | null
+  cleanupTime: string
+  cleanupServerId?: string
+  namingConventionEnabled: boolean
+  staleDays: number
+  dormantDays: number
+  servers: { id: string; name: string }[]
+}
 
 interface CleanupResult {
   renamed: { id: string; oldName: string; newName: string; method: 'ai' | 'normalize' }[]
@@ -16,67 +37,135 @@ interface CleanupResult {
   errors: { id: string; name: string; error: string }[]
 }
 
-export default function SettingsClient() {
-  const [servers, setServers] = useState<ElectronServer[]>([])
+// ─── 키 입력 컴포넌트 ──────────────────────────────────────────
+
+function SecretInput({
+  label,
+  placeholder,
+  configured,
+  source,
+  helpText,
+  helpUrl,
+  onSave,
+}: {
+  label: string
+  placeholder: string
+  configured: boolean
+  source: 'env' | 'config' | null
+  helpText?: string
+  helpUrl?: string
+  onSave: (value: string) => Promise<void>
+}) {
+  const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  // Gemini 키 상태
-  const [geminiConfigured, setGeminiConfigured] = useState(false)
-  const [geminiSource, setGeminiSource] = useState<'env' | 'config' | null>(null)
-  const [geminiKeyInput, setGeminiKeyInput] = useState('')
-  const [geminiSaving, setGeminiSaving] = useState(false)
-  const [geminiSaveError, setGeminiSaveError] = useState<string | null>(null)
-  const [geminiSaveOk, setGeminiSaveOk] = useState(false)
-
-  // AI 자동 정리 상태
-  const [cleanupRunning, setCleanupRunning] = useState(false)
-  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
-  const [cleanupError, setCleanupError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // 서버 목록 (Electron)
-    if (window.electronAPI) {
-      window.electronAPI.getServers().then(setServers)
-    }
-    // Gemini 설정 상태
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then((d) => {
-        setGeminiConfigured(d.geminiConfigured ?? false)
-        setGeminiSource(d.geminiSource ?? null)
-      })
-      .catch(() => {})
-  }, [])
-
-  async function saveGeminiKey() {
-    if (!geminiKeyInput.trim()) return
-    setGeminiSaving(true)
-    setGeminiSaveError(null)
-    setGeminiSaveOk(false)
+  async function handleSave() {
+    if (!value.trim()) return
+    setSaving(true)
     try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ geminiApiKey: geminiKeyInput }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setGeminiSaveError(data.error ?? '저장 실패')
-      } else {
-        setGeminiConfigured(true)
-        setGeminiSource('config')
-        setGeminiKeyInput('')
-        setGeminiSaveOk(true)
-        setTimeout(() => setGeminiSaveOk(false), 3000)
-      }
-    } catch (err) {
-      setGeminiSaveError(String(err))
+      await onSave(value.trim())
+      setValue('')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      toast.error('저장 실패')
     } finally {
-      setGeminiSaving(false)
+      setSaving(false)
     }
   }
 
-  async function runCleanup() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        {configured ? (
+          <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+            설정됨{source === 'env' ? ' (환경변수)' : ''}
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
+            미설정
+          </Badge>
+        )}
+      </div>
+      {source !== 'env' && (
+        <>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            />
+            <Button size="sm" onClick={handleSave} disabled={saving || !value.trim()} className="gap-1 shrink-0">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              저장
+            </Button>
+          </div>
+          {saved && <p className="text-xs text-green-600">저장되었습니다.</p>}
+        </>
+      )}
+      {helpText && (
+        <p className="text-xs text-muted-foreground">
+          {helpUrl ? (
+            <a href={helpUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              {helpText}
+            </a>
+          ) : helpText}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── 메인 컴포넌트 ─────────────────────────────────────────────
+
+export default function SettingsClient({ servers }: { servers: { id: string; name: string }[] }) {
+  const [config, setConfig] = useState<ConfigState | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // 자동 정리 상태
+  const [cleanupRunning, setCleanupRunning] = useState(false)
+  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
+  const [cleanupError, setCleanupError] = useState<string | null>(null)
+  const [cleanupServerId, setCleanupServerId] = useState('')
+
+  // Electron 서버 관리
+  const [electronServers, setElectronServers] = useState<{ id: string; name: string; url: string; apiKey: string }[]>([])
+  const [electronSaving, setElectronSaving] = useState(false)
+  const isElectron = typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).electronAPI
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((d) => {
+        setConfig(d)
+        setCleanupServerId(d.cleanupServerId || (d.servers[0]?.id ?? ''))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+
+    if (isElectron) {
+      (window as unknown as { electronAPI: { getServers: () => Promise<typeof electronServers> } })
+        .electronAPI.getServers().then(setElectronServers)
+    }
+  }, [])
+
+  async function saveConfig(updates: Record<string, unknown>) {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    if (!res.ok) throw new Error('저장 실패')
+    // 상태 리프레시
+    const d = await fetch('/api/config').then((r) => r.json())
+    setConfig(d)
+  }
+
+  async function runCleanup(dryRun: boolean) {
     setCleanupRunning(true)
     setCleanupResult(null)
     setCleanupError(null)
@@ -84,13 +173,14 @@ export default function SettingsClient() {
       const res = await fetch('/api/auto-cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serverId: 'server1' }),
+        body: JSON.stringify({ serverId: cleanupServerId, dryRun }),
       })
       const data = await res.json()
       if (!res.ok) {
         setCleanupError(data.error ?? '알 수 없는 오류')
       } else {
         setCleanupResult(data)
+        if (!dryRun) toast.success('자동 정리 완료')
       }
     } catch (err) {
       setCleanupError(String(err))
@@ -99,122 +189,146 @@ export default function SettingsClient() {
     }
   }
 
-  function addServer() {
-    const nextId = `server${servers.length + 1}`
-    setServers([...servers, { id: nextId, name: '', url: '', apiKey: '' }])
-  }
-
-  function updateServer(index: number, field: keyof ElectronServer, value: string) {
-    const updated = [...servers]
-    updated[index] = { ...updated[index], [field]: value }
-    setServers(updated)
-  }
-
-  function removeServer(index: number) {
-    setServers(servers.filter((_, i) => i !== index))
-  }
-
-  async function handleSave() {
-    if (!window.electronAPI) return
-    setSaving(true)
-    const normalized = servers.map((s, i) => ({
-      ...s,
-      id: `server${i + 1}`,
-      url: s.url.replace(/\/+$/, ''),
-    }))
-    await window.electronAPI.saveServers(normalized)
-  }
+  if (loading) return <div className="text-muted-foreground text-sm">설정 불러오는 중...</div>
+  if (!config) return <div className="text-destructive text-sm">설정을 불러올 수 없습니다.</div>
 
   return (
-    <div className="space-y-6">
-      {/* ── AI 자동 정리 ───────────────────────────── */}
+    <div className="space-y-6 max-w-2xl">
+      {/* ── API 키 관리 ───────────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">AI 자동 정리</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><Key size={16} /> API 키</CardTitle>
+          <CardDescription>외부 서비스 연동에 필요한 API 키를 관리합니다</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <SecretInput
+            label="Gemini API 키"
+            placeholder="AIza..."
+            configured={config.geminiConfigured}
+            source={config.geminiSource}
+            helpText="Google AI Studio에서 무료 발급 · gemini-2.0-flash"
+            helpUrl="https://aistudio.google.com/app/apikey"
+            onSave={async (v) => {
+              await saveConfig({ geminiApiKey: v })
+              toast.success('Gemini API 키 저장됨')
+            }}
+          />
+
+          <SecretInput
+            label="Slack Webhook URL"
+            placeholder="https://hooks.slack.com/services/..."
+            configured={config.slackConfigured}
+            source={config.slackSource}
+            helpText="자동 정리 결과, 에러 알림 등을 Slack으로 받습니다"
+            onSave={async (v) => {
+              await saveConfig({ slackWebhookUrl: v })
+              toast.success('Slack Webhook 저장됨')
+            }}
+          />
+
+          <SecretInput
+            label="Cron 인증 시크릿"
+            placeholder="openssl rand -base64 32"
+            configured={config.cronSecretConfigured}
+            source={config.cronSecretSource}
+            helpText="Vercel Cron 엔드포인트 인증용 시크릿"
+            onSave={async (v) => {
+              await saveConfig({ cronSecret: v })
+              toast.success('Cron 시크릿 저장됨')
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {/* ── 자동 정리 설정 ─────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Sparkles size={16} /> AI 자동 정리</CardTitle>
+          <CardDescription>워크플로우 이름 정규화 및 AI 이름 제안 설정</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Gemini 키 상태 */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Gemini API 키</span>
-            {geminiConfigured ? (
-              <Badge variant="outline" className="text-green-600 border-green-600">
-                설정됨{geminiSource === 'env' ? ' (환경변수)' : ''}
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                미설정
-              </Badge>
-            )}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">네이밍 컨벤션 검사</p>
+              <p className="text-xs text-muted-foreground">[프로젝트명] 기능 설명 형식 검사</p>
+            </div>
+            <Switch
+              checked={config.namingConventionEnabled}
+              onCheckedChange={async (v) => {
+                await saveConfig({ namingConventionEnabled: v })
+                toast.success(v ? '네이밍 컨벤션 활성화' : '네이밍 컨벤션 비활성화')
+              }}
+            />
           </div>
 
-          {/* 키 입력 (env에서 읽히면 숨김) */}
-          {geminiSource !== 'env' && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {geminiConfigured ? 'Gemini API 키 변경' : 'Gemini API 키 입력'}
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="password"
-                  placeholder="AIza..."
-                  value={geminiKeyInput}
-                  onChange={(e) => setGeminiKeyInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && saveGeminiKey()}
-                />
-                <Button
-                  size="sm"
-                  onClick={saveGeminiKey}
-                  disabled={geminiSaving || !geminiKeyInput.trim()}
-                  className="gap-1 shrink-0"
-                >
-                  {geminiSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  저장
-                </Button>
-              </div>
-              {geminiSaveError && (
-                <p className="text-xs text-destructive">{geminiSaveError}</p>
-              )}
-              {geminiSaveOk && (
-                <p className="text-xs text-green-600">저장되었습니다.</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2"
-                >
-                  Google AI Studio
-                </a>
-                에서 무료로 발급 · gemini-2.0-flash 사용
-              </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">대상 서버</label>
+              <Select
+                value={cleanupServerId}
+                onValueChange={(v) => {
+                  if (v) {
+                    setCleanupServerId(v)
+                    saveConfig({ cleanupServerId: v })
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {servers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">실행 시간 (KST)</label>
+              <Input
+                value={config.cleanupTime}
+                onChange={async (e) => {
+                  const v = e.target.value
+                  setConfig({ ...config, cleanupTime: v })
+                }}
+                onBlur={async (e) => {
+                  await saveConfig({ cleanupTime: e.target.value })
+                }}
+                placeholder="03:00"
+              />
+            </div>
+          </div>
 
           <p className="text-sm text-muted-foreground">
-            기본 이름 워크플로우(workflow, My workflow)는 AI가 노드 내용으로 이름을 제안하고,
+            기본 이름(workflow, My workflow)은 AI가 노드 내용으로 이름을 제안하고,
             복사/버전 마커((copy), v1, mk2)는 자동 정규화됩니다.
-            매일 03:00 KST 자동 실행됩니다.
           </p>
 
-          <Button
-            onClick={runCleanup}
-            disabled={cleanupRunning || !geminiConfigured}
-            size="sm"
-            className="gap-2"
-          >
-            {cleanupRunning ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                실행 중...
-              </>
-            ) : (
-              <>
-                <Play size={14} />
-                지금 실행
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => runCleanup(true)}
+              disabled={cleanupRunning || !config.geminiConfigured}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              {cleanupRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              미리보기 (Dry Run)
+            </Button>
+            <Button
+              onClick={() => runCleanup(false)}
+              disabled={cleanupRunning || !config.geminiConfigured}
+              size="sm"
+              className="gap-2"
+            >
+              {cleanupRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              지금 실행
+            </Button>
+          </div>
+
+          {!config.geminiConfigured && (
+            <p className="text-xs text-yellow-600">Gemini API 키를 먼저 설정하세요.</p>
+          )}
 
           {cleanupError && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
@@ -227,13 +341,13 @@ export default function SettingsClient() {
             <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
               <div className="flex items-center gap-2 font-medium">
                 <CheckCircle size={14} className="text-green-600" />
-                정리 완료
+                {cleanupResult.renamed.length > 0 ? '정리 결과' : '변경할 항목 없음'}
               </div>
               <div className="text-muted-foreground space-y-1">
                 <p>이름 변경: {cleanupResult.renamed.length}개</p>
                 {cleanupResult.renamed.length > 0 && (
                   <ul className="ml-3 space-y-0.5">
-                    {cleanupResult.renamed.map((r) => (
+                    {cleanupResult.renamed.slice(0, 10).map((r) => (
                       <li key={r.id}>
                         <span className="line-through text-muted-foreground/60">{r.oldName}</span>
                         {' → '}
@@ -243,14 +357,14 @@ export default function SettingsClient() {
                         </span>
                       </li>
                     ))}
+                    {cleanupResult.renamed.length > 10 && (
+                      <li className="text-muted-foreground/60">... 외 {cleanupResult.renamed.length - 10}개</li>
+                    )}
                   </ul>
                 )}
                 {cleanupResult.credentialWarnings.length > 0 && (
                   <p className="text-yellow-600">
                     크레덴셜 이상 이름: {cleanupResult.credentialWarnings.length}개
-                    {' ('}
-                    {cleanupResult.credentialWarnings.map((c) => c.name).join(', ')}
-                    {')'}
                   </p>
                 )}
                 {cleanupResult.errors.length > 0 && (
@@ -262,119 +376,170 @@ export default function SettingsClient() {
         </CardContent>
       </Card>
 
-      {/* ── Claude Code 연결 ───────────────────────── */}
+      {/* ── 모니터링 기준 설정 ─────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Claude Code 연결</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><Clock size={16} /> 모니터링 기준</CardTitle>
+          <CardDescription>스케줄 페이지의 점검 기준값을 설정합니다</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Claude Code에서 자연어로 n8n을 관리할 수 있습니다.
-          </p>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium">1. Claude Code 설치</p>
+              <label className="text-sm font-medium">비활성 워크플로우 기준</label>
               <div className="flex items-center gap-2">
-                <code className="bg-muted px-2 py-1 rounded text-xs flex-1 font-mono">
-                  npm install -g @anthropic-ai/claude-code
-                </code>
-                <Button variant="outline" size="sm" onClick={() => {
-                  navigator.clipboard.writeText('npm install -g @anthropic-ai/claude-code')
-                  toast.success('클립보드에 복사했습니다')
-                }}>
-                  복사
-                </Button>
+                <Input
+                  type="number"
+                  value={config.staleDays}
+                  onChange={(e) => setConfig({ ...config, staleDays: Number(e.target.value) })}
+                  onBlur={async (e) => {
+                    await saveConfig({ staleDays: Number(e.target.value) })
+                    toast.success('저장됨')
+                  }}
+                  className="w-20"
+                  min={1}
+                />
+                <span className="text-sm text-muted-foreground">일 이상 미사용</span>
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium">2. 프로젝트 폴더에서 실행</p>
+              <label className="text-sm font-medium">휴면 유저 기준</label>
               <div className="flex items-center gap-2">
-                <code className="bg-muted px-2 py-1 rounded text-xs flex-1 font-mono">
-                  cd n8n-admin && claude
-                </code>
-                <Button variant="outline" size="sm" onClick={() => {
-                  navigator.clipboard.writeText('cd n8n-admin && claude')
-                  toast.success('클립보드에 복사했습니다')
-                }}>
-                  복사
-                </Button>
+                <Input
+                  type="number"
+                  value={config.dormantDays}
+                  onChange={(e) => setConfig({ ...config, dormantDays: Number(e.target.value) })}
+                  onBlur={async (e) => {
+                    await saveConfig({ dormantDays: Number(e.target.value) })
+                    toast.success('저장됨')
+                  }}
+                  className="w-20"
+                  min={1}
+                />
+                <span className="text-sm text-muted-foreground">일 이상 미접속</span>
               </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">3. 사용 가능한 명령 예시</p>
-              <ul className="text-sm text-muted-foreground space-y-1 ml-1">
-                <li>• &quot;워크플로우 목록 보여줘&quot;</li>
-                <li>• &quot;Slack 알림 워크플로우 만들어줘&quot;</li>
-                <li>• &quot;전체 워크플로우 이름 정리해줘&quot;</li>
-                <li>• &quot;에러 리포트 보여줘&quot;</li>
-              </ul>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ── 서버 설정 (Electron 전용) ───────────────── */}
-      {typeof window !== 'undefined' && window.electronAPI?.isElectron ? (
-        <>
-          {servers.map((server, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">{server.name || `서버 ${i + 1}`}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeServer(i)}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 size={16} />
+      {/* ── 서버 연결 정보 ──────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Server size={16} /> 서버 연결</CardTitle>
+          <CardDescription>현재 연결된 n8n 서버 목록</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isElectron ? (
+            <>
+              {electronServers.map((server, i) => (
+                <div key={i} className="space-y-3 rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{server.name || `서버 ${i + 1}`}</span>
+                    <Button
+                      variant="ghost" size="icon"
+                      onClick={() => setElectronServers(electronServers.filter((_, idx) => idx !== i))}
+                      className="text-muted-foreground hover:text-destructive h-7 w-7"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                  <div className="grid gap-2">
+                    <Input
+                      value={server.name}
+                      onChange={(e) => {
+                        const u = [...electronServers]; u[i] = { ...u[i], name: e.target.value }; setElectronServers(u)
+                      }}
+                      placeholder="서버 이름"
+                    />
+                    <Input
+                      value={server.url}
+                      onChange={(e) => {
+                        const u = [...electronServers]; u[i] = { ...u[i], url: e.target.value }; setElectronServers(u)
+                      }}
+                      placeholder="https://n8n.example.com"
+                    />
+                    <Input
+                      type="password"
+                      value={server.apiKey}
+                      onChange={(e) => {
+                        const u = [...electronServers]; u[i] = { ...u[i], apiKey: e.target.value }; setElectronServers(u)
+                      }}
+                      placeholder="API 키"
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => {
+                  setElectronServers([...electronServers, { id: `server${electronServers.length + 1}`, name: '', url: '', apiKey: '' }])
+                }} className="gap-1">
+                  <Plus size={14} /> 서버 추가
                 </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">이름</label>
-                  <Input
-                    value={server.name}
-                    onChange={(e) => updateServer(i, 'name', e.target.value)}
-                    placeholder="My Server"
-                  />
+                <Button size="sm" disabled={electronSaving} onClick={async () => {
+                  setElectronSaving(true)
+                  const api = (window as unknown as { electronAPI: { saveServers: (s: typeof electronServers) => Promise<void> } }).electronAPI
+                  await api.saveServers(electronServers.map((s, i) => ({ ...s, id: `server${i + 1}`, url: s.url.replace(/\/+$/, '') })))
+                  toast.success('서버 설정 저장됨')
+                  setElectronSaving(false)
+                }}>
+                  {electronSaving ? '저장 중...' : '저장 후 적용'}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {servers.length > 0 ? (
+                <div className="space-y-2">
+                  {servers.map((s) => (
+                    <div key={s.id} className="flex items-center gap-3 text-sm">
+                      <Badge variant="outline" className="font-mono text-xs">{s.id}</Badge>
+                      <span>{s.name}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">URL</label>
-                  <Input
-                    value={server.url}
-                    onChange={(e) => updateServer(i, 'url', e.target.value)}
-                    placeholder="https://n8n.example.com"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">API 키</label>
-                  <Input
-                    value={server.apiKey}
-                    onChange={(e) => updateServer(i, 'apiKey', e.target.value)}
-                    placeholder="API 키"
-                    type="password"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+              ) : (
+                <p className="text-sm text-muted-foreground">연결된 서버가 없습니다.</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                웹 환경에서는 .env 파일의 SERVER_URL, SERVER_API_KEY로 서버를 관리합니다.
+                데스크톱 앱에서는 UI로 직접 편집할 수 있습니다.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={addServer} className="gap-2">
-              <Plus size={16} />
-              서버 추가
-            </Button>
-            <Button onClick={handleSave} disabled={saving || servers.length === 0}>
-              {saving ? '저장 중...' : '저장 후 적용'}
-            </Button>
+      {/* ── Claude Code 연결 ───────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Shield size={16} /> Claude Code 연결</CardTitle>
+          <CardDescription>자연어로 n8n을 관리할 수 있습니다</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">1. 설치</p>
+              <code className="block bg-muted px-3 py-2 rounded text-xs font-mono">
+                npm install -g @anthropic-ai/claude-code
+              </code>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">2. 실행</p>
+              <code className="block bg-muted px-3 py-2 rounded text-xs font-mono">
+                cd n8n-admin && claude
+              </code>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">3. 사용 예시</p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-1">
+                <li>&bull; &quot;워크플로우 목록 보여줘&quot;</li>
+                <li>&bull; &quot;Slack 알림 워크플로우 만들어줘&quot;</li>
+                <li>&bull; &quot;에러 리포트 보여줘&quot;</li>
+              </ul>
+            </div>
           </div>
-        </>
-      ) : (
-        <p className="text-muted-foreground text-sm">
-          서버 연결 설정은 데스크톱 앱에서만 관리할 수 있습니다.
-          웹 배포에서는 .env 파일을 직접 편집하세요.
-        </p>
-      )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

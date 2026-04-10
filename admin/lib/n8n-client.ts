@@ -1,4 +1,4 @@
-import { ServerConfig, N8nWorkflow, N8nUser, N8nCredential, N8nProject } from './types'
+import { ServerConfig, N8nWorkflow, N8nUser, N8nCredential, N8nProject, N8nExecution } from './types'
 
 async function fetchAllPages<T>(url: string, apiKey: string): Promise<T[]> {
   const results: T[] = []
@@ -195,4 +195,55 @@ export function workflowHasErrorTrigger(workflow: N8nWorkflow): boolean {
   return (workflow.nodes ?? []).some(
     (node: unknown) => (node as { type?: string }).type === 'n8n-nodes-base.errorTrigger'
   )
+}
+
+export async function listTags(server: ServerConfig): Promise<{ id: string; name: string }[]> {
+  const res = await fetch(`${server.url}/api/v1/tags`, {
+    headers: { 'X-N8N-API-KEY': server.apiKey, Accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`Failed to list tags: ${res.status}`)
+  const data = await res.json()
+  return data.data ?? data
+}
+
+export async function createTag(server: ServerConfig, name: string): Promise<{ id: string; name: string }> {
+  const res = await fetch(`${server.url}/api/v1/tags`, {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': server.apiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error(`Failed to create tag: ${res.status}`)
+  return res.json()
+}
+
+export async function listExecutions(
+  server: ServerConfig,
+  filters?: { status?: string; workflowId?: string; limit?: number }
+): Promise<N8nExecution[]> {
+  const params = new URLSearchParams()
+  if (filters?.status) params.set('status', filters.status)
+  if (filters?.workflowId) params.set('workflowId', filters.workflowId)
+  params.set('limit', String(filters?.limit ?? 20))
+
+  const res = await fetch(`${server.url}/api/v1/executions?${params.toString()}`, {
+    headers: { 'X-N8N-API-KEY': server.apiKey, Accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`Failed to list executions: ${res.status}`)
+  const data = await res.json()
+  return data.data ?? data
+}
+
+export async function getExecution(server: ServerConfig, id: string): Promise<N8nExecution> {
+  const res = await fetch(`${server.url}/api/v1/executions/${id}`, {
+    headers: { 'X-N8N-API-KEY': server.apiKey, Accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`Failed to get execution: ${res.status}`)
+  return res.json()
 }
