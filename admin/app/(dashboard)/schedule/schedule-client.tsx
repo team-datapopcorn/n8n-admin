@@ -113,7 +113,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 1. 네이밍 컨벤션
   const violations = useQuery<ViolationsResponse>({
     queryKey: ['naming-violations', server],
-    queryFn: () => fetch(`/api/servers/${server}/naming-violations`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/naming-violations`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -121,7 +121,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 2. 에러 트리거
   const errorTrigger = useQuery<ErrorTriggerResponse>({
     queryKey: ['error-trigger-check', server],
-    queryFn: () => fetch(`/api/servers/${server}/error-trigger-check`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/error-trigger-check`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -129,7 +129,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 3. 휴면 유저
   const dormant = useQuery<DormantResponse>({
     queryKey: ['dormant-users', server],
-    queryFn: () => fetch(`/api/servers/${server}/dormant-users?days=30`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/dormant-users?days=30`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -137,7 +137,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 4. 비활성 워크플로우
   const stale = useQuery<StaleResponse>({
     queryKey: ['stale-workflows', server],
-    queryFn: () => fetch(`/api/servers/${server}/stale-workflows?days=30`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/stale-workflows?days=30`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -145,7 +145,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 5. 크레덴셜 이상
   const credCheck = useQuery<CredCheckResponse>({
     queryKey: ['credential-check', server],
-    queryFn: () => fetch(`/api/servers/${server}/credential-check`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/credential-check`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -153,7 +153,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 6. 실행 에러
   const execErrors = useQuery<ExecErrorResponse>({
     queryKey: ['execution-errors', server],
-    queryFn: () => fetch(`/api/servers/${server}/execution-errors`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/execution-errors`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -161,7 +161,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 7. 중복 워크플로우
   const duplicates = useQuery<DuplicateResponse>({
     queryKey: ['duplicate-workflows', server],
-    queryFn: () => fetch(`/api/servers/${server}/duplicate-workflows`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/duplicate-workflows`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -169,7 +169,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 8. 크로스 서버 동기화
   const crossServer = useQuery<CrossServerResponse>({
     queryKey: ['cross-server-sync'],
-    queryFn: () => fetch('/api/cross-server-sync').then((r) => r.json()),
+    queryFn: async () => { const r = await fetch('/api/cross-server-sync'); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 5 * 60 * 1000,
     enabled: servers.length >= 2,
   })
@@ -177,7 +177,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 9. 태그 미분류
   const untagged = useQuery<UntaggedResponse>({
     queryKey: ['untagged-workflows', server],
-    queryFn: () => fetch(`/api/servers/${server}/untagged-workflows`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/untagged-workflows`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -185,7 +185,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   // 10. 대형 워크플로우
   const largeWf = useQuery<LargeResponse>({
     queryKey: ['large-workflows', server],
-    queryFn: () => fetch(`/api/servers/${server}/large-workflows?nodes=50`).then((r) => r.json()),
+    queryFn: async () => { const r = await fetch(`/api/servers/${server}/large-workflows?nodes=50`); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
     staleTime: 2 * 60 * 1000,
     enabled: !!server,
   })
@@ -263,7 +263,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
 
         {violations.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !violations.data?.violations.length ? (
+        ) : !violations.data?.violations?.length ? (
           <p className="text-sm text-muted-foreground">모든 워크플로우가 컨벤션을 준수합니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -312,7 +312,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {errorTrigger.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !errorTrigger.data?.missing.length ? (
+        ) : !errorTrigger.data?.missing?.length ? (
           <p className="text-sm text-muted-foreground">모든 활성 워크플로우에 에러 트리거가 등록되어 있습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -358,7 +358,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {dormant.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !dormant.data?.dormant.length ? (
+        ) : !dormant.data?.dormant?.length ? (
           <p className="text-sm text-muted-foreground">휴면 유저가 없습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -403,7 +403,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {stale.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !stale.data?.stale.length ? (
+        ) : !stale.data?.stale?.length ? (
           <p className="text-sm text-muted-foreground">정리가 필요한 워크플로우가 없습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -451,7 +451,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {credCheck.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !credCheck.data?.abnormal.length ? (
+        ) : !credCheck.data?.abnormal?.length ? (
           <p className="text-sm text-muted-foreground">이상 이름 크레덴셜이 없습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -488,7 +488,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {execErrors.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !execErrors.data?.byWorkflow.length ? (
+        ) : !execErrors.data?.byWorkflow?.length ? (
           <p className="text-sm text-muted-foreground">최근 24시간 에러가 없습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -528,7 +528,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {duplicates.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !duplicates.data?.duplicates.length ? (
+        ) : !duplicates.data?.duplicates?.length ? (
           <p className="text-sm text-muted-foreground">중복 워크플로우가 없습니다</p>
         ) : (
           <div className="space-y-2 max-h-72 overflow-auto">
@@ -560,7 +560,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
           </p>
           {crossServer.isLoading ? (
             <p className="text-sm text-muted-foreground">불러오는 중...</p>
-          ) : !crossServer.data?.items.length ? (
+          ) : !crossServer.data?.items?.length ? (
             <p className="text-sm text-muted-foreground">크로스 서버 워크플로우가 없습니다</p>
           ) : (
             <div className="rounded-md border max-h-64 overflow-auto">
@@ -605,7 +605,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {untagged.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !untagged.data?.untagged.length ? (
+        ) : !untagged.data?.untagged?.length ? (
           <p className="text-sm text-muted-foreground">모든 워크플로우에 태그가 있습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
@@ -652,7 +652,7 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {largeWf.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !largeWf.data?.large.length ? (
+        ) : !largeWf.data?.large?.length ? (
           <p className="text-sm text-muted-foreground">대형 워크플로우가 없습니다</p>
         ) : (
           <div className="rounded-md border max-h-64 overflow-auto">
