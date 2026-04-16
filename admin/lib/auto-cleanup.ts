@@ -97,10 +97,10 @@ export async function runAutoCleanup(
 ): Promise<CleanupResult> {
   const result: CleanupResult = { renamed: [], skipped: [], credentialWarnings: [], errors: [], conventionViolations: [] }
 
-  // 1. 전체 워크플로우 + 크레덴셜 가져오기
+  // 1. 전체 워크플로우 + 크레덴셜 가져오기 (크레덴셜은 403 등 실패 시 빈 배열)
   const [workflows, credentials] = await Promise.all([
     listWorkflows(server),
-    listCredentials(server),
+    listCredentials(server).catch(() => []),
   ])
 
   // 2. 크레덴셜 이상 이름 보고 (변경 없음)
