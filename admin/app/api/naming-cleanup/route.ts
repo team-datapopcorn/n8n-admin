@@ -3,6 +3,8 @@ import { getServer, getServers } from '@/lib/server-config'
 import { runAutoCleanup } from '@/lib/auto-cleanup'
 import { getGeminiApiKey } from '@/lib/config-store'
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({})) as { serverId?: string }

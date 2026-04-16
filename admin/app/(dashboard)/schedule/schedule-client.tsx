@@ -30,7 +30,7 @@ interface StaleWorkflow { id: string; name: string; updatedAt: string; daysSince
 interface StaleResponse { totalWorkflows: number; staleCount: number; daysThreshold: number; stale: StaleWorkflow[] }
 
 interface AbnormalCred { id: string; name: string; type: string; updatedAt: string }
-interface CredCheckResponse { totalCredentials: number; abnormalCount: number; abnormal: AbnormalCred[] }
+interface CredCheckResponse { totalCredentials: number; abnormalCount: number; abnormal: AbnormalCred[]; restricted?: boolean }
 
 interface ExecErrorResponse {
   totalErrors24h: number; affectedWorkflows: number
@@ -102,10 +102,18 @@ function Section({ title, icon: Icon, badge, badgeVariant, children, action }: {
 
 // ─── 메인 ──────────────────────────────────────────────────
 
+interface ConfigResponse { geminiConfigured: boolean; geminiSource?: string }
+
 export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
   const [server, setServer] = useState(servers[0]?.id ?? '')
   const [lastCleanup, setLastCleanup] = useState<CleanupResponse | null>(null)
   const qc = useQueryClient()
+
+  const geminiConfig = useQuery<ConfigResponse>({
+    queryKey: ['gemini-config'],
+    queryFn: async () => { const r = await fetch('/api/config'); if (!r.ok) throw new Error(`${r.status}`); return r.json() },
+    staleTime: 60 * 1000,
+  })
 
   const serverUrl = servers.find((s) => s.id === server)?.url ?? ''
   const serverLabels = Object.fromEntries(servers.map((s) => [s.id, s.name]))
@@ -239,10 +247,15 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         badge={violations.data?.violationCount ?? '-'}
         badgeVariant={violations.data?.violationCount ? 'destructive' : 'secondary'}
         action={
-          <Button size="sm" onClick={() => cleanupMutation.mutate()} disabled={cleanupMutation.isPending}>
-            <Play size={14} className="mr-1.5" />
-            {cleanupMutation.isPending ? '실행 중...' : '지금 실행'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {geminiConfig.data && !geminiConfig.data.geminiConfigured && (
+              <a href="/settings" className="text-xs text-amber-600 hover:underline">Gemini 키 필요</a>
+            )}
+            <Button size="sm" onClick={() => cleanupMutation.mutate()} disabled={cleanupMutation.isPending || !geminiConfig.data?.geminiConfigured}>
+              <Play size={14} className="mr-1.5" />
+              {cleanupMutation.isPending ? '실행 중...' : '지금 실행'}
+            </Button>
+          </div>
         }
       >
         <p className="text-xs text-muted-foreground mb-3">
@@ -451,6 +464,8 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
         </p>
         {credCheck.isLoading ? (
           <p className="text-sm text-muted-foreground">불러오는 중...</p>
+        ) : credCheck.data?.restricted ? (
+          <p className="text-sm text-muted-foreground">이 서버는 크레덴셜 API 접근이 제한되어 있습니다</p>
         ) : !credCheck.data?.abnormal?.length ? (
           <p className="text-sm text-muted-foreground">이상 이름 크레덴셜이 없습니다</p>
         ) : (
