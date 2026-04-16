@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 // ─── 타입 ──────────────────────────────────────────────────────
 
 interface ConfigState {
+  isVercel: boolean
   geminiConfigured: boolean
   geminiSource: 'env' | 'config' | null
   cronSecretConfigured: boolean
@@ -47,6 +48,7 @@ function SecretInput({
   helpText,
   helpUrl,
   onSave,
+  isVercel,
 }: {
   label: string
   placeholder: string
@@ -55,6 +57,7 @@ function SecretInput({
   helpText?: string
   helpUrl?: string
   onSave: (value: string) => Promise<void>
+  isVercel?: boolean
 }) {
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
@@ -90,22 +93,28 @@ function SecretInput({
         )}
       </div>
       {source !== 'env' && (
-        <>
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-            />
-            <Button size="sm" onClick={handleSave} disabled={saving || !value.trim()} className="gap-1 shrink-0">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              저장
-            </Button>
-          </div>
-          {saved && <p className="text-xs text-green-600">저장되었습니다.</p>}
-        </>
+        isVercel ? (
+          <p className="text-xs text-blue-600">
+            Vercel 대시보드 → Settings → Environment Variables에서 설정해주세요.
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder={placeholder}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              />
+              <Button size="sm" onClick={handleSave} disabled={saving || !value.trim()} className="gap-1 shrink-0">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                저장
+              </Button>
+            </div>
+            {saved && <p className="text-xs text-green-600">저장되었습니다.</p>}
+          </>
+        )
       )}
       {helpText && (
         <p className="text-xs text-muted-foreground">
@@ -159,7 +168,13 @@ export default function SettingsClient({ servers }: { servers: { id: string; nam
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     })
-    if (!res.ok) throw new Error('저장 실패')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      if (data.vercel) {
+        toast.error('Vercel 환경에서는 Vercel 대시보드 → Settings → Environment Variables에서 설정해주세요.')
+      }
+      throw new Error(data.error || '저장 실패')
+    }
     // 상태 리프레시
     const d = await fetch('/api/config').then((r) => r.json())
     setConfig(d)
@@ -194,6 +209,17 @@ export default function SettingsClient({ servers }: { servers: { id: string; nam
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* ── Vercel 환경 안내 ─────────────────────────────── */}
+      {config.isVercel && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-4 text-sm space-y-1">
+          <p className="font-medium text-blue-800 dark:text-blue-300">Vercel 클라우드 배포 환경</p>
+          <p className="text-blue-700 dark:text-blue-400">
+            설정값은 <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 font-medium">Vercel 대시보드</a> → 프로젝트 → Settings → Environment Variables에서 관리해주세요.
+            환경변수로 설정된 값은 아래에 &quot;설정됨 (환경변수)&quot;로 표시됩니다.
+          </p>
+        </div>
+      )}
+
       {/* ── API 키 관리 ───────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -208,6 +234,7 @@ export default function SettingsClient({ servers }: { servers: { id: string; nam
             source={config.geminiSource}
             helpText="Google AI Studio에서 무료 발급 · gemini-2.0-flash"
             helpUrl="https://aistudio.google.com/app/apikey"
+            isVercel={config.isVercel}
             onSave={async (v) => {
               await saveConfig({ geminiApiKey: v })
               toast.success('Gemini API 키 저장됨')
@@ -220,6 +247,7 @@ export default function SettingsClient({ servers }: { servers: { id: string; nam
             configured={config.slackConfigured}
             source={config.slackSource}
             helpText="자동 정리 결과, 에러 알림 등을 Slack으로 받습니다"
+            isVercel={config.isVercel}
             onSave={async (v) => {
               await saveConfig({ slackWebhookUrl: v })
               toast.success('Slack Webhook 저장됨')
@@ -232,6 +260,7 @@ export default function SettingsClient({ servers }: { servers: { id: string; nam
             configured={config.cronSecretConfigured}
             source={config.cronSecretSource}
             helpText="Vercel Cron 엔드포인트 인증용 시크릿"
+            isVercel={config.isVercel}
             onSave={async (v) => {
               await saveConfig({ cronSecret: v })
               toast.success('Cron 시크릿 저장됨')

@@ -14,6 +14,8 @@ export async function GET() {
   const servers = getServers()
 
   return NextResponse.json({
+    // 배포 환경 정보
+    isVercel: Boolean(process.env.VERCEL),
     // API 키 상태 (값은 숨김)
     geminiConfigured: isGeminiConfigured(),
     geminiSource: process.env.GEMINI_API_KEY ? 'env' : config.geminiApiKey ? 'config' : null,
@@ -34,6 +36,14 @@ export async function GET() {
 
 // POST: 설정 저장
 export async function POST(req: Request) {
+  // Vercel 서버리스 환경에서는 파일 시스템 쓰기 불가
+  if (process.env.VERCEL) {
+    return NextResponse.json(
+      { error: 'Vercel 환경에서는 UI 설정 저장이 지원되지 않습니다. Vercel 대시보드에서 환경변수를 설정해주세요.', vercel: true },
+      { status: 400 },
+    )
+  }
+
   const body = (await req.json().catch(() => ({}))) as Partial<AppConfig>
 
   // API 키 저장 (개별 처리)
