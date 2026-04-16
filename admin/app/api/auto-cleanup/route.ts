@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getServer } from '@/lib/server-config'
 import { runAutoCleanup } from '@/lib/auto-cleanup'
-import { getGeminiApiKey } from '@/lib/config-store'
+import { getGeminiApiKey, getSlackWebhookUrl } from '@/lib/config-store'
+import { sendSlackCleanupReport } from '@/lib/slack'
 
 export const maxDuration = 300
 
@@ -21,6 +22,19 @@ export async function POST(req: Request) {
   try {
     const server = getServer(serverId)
     const result = await runAutoCleanup(server, geminiApiKey, dryRun)
+
+    // 수동 실행 시에도 Slack 알림 (dry run 제외)
+    if (!dryRun) {
+      const slackWebhookUrl = getSlackWebhookUrl()
+      if (slackWebhookUrl) {
+        await sendSlackCleanupReport(
+          slackWebhookUrl,
+          [{ serverId, serverName: server.name, ...result }],
+          'manual',
+        ).catch(() => {})
+      }
+    }
+
     return NextResponse.json({ ok: true, serverId, dryRun, ...result })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
