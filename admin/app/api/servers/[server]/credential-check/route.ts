@@ -7,7 +7,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ser
   try {
     const { server: serverId } = await params
     const server = getServer(serverId)
-    const credentials = await listCredentials(server)
+    let credentials = []
+    try {
+      credentials = await listCredentials(server)
+    } catch {
+      // n8n Cloud 등 403 제한 시 빈 결과 반환
+      return NextResponse.json({ totalCredentials: 0, abnormalCount: 0, abnormal: [], restricted: true })
+    }
 
     const abnormal = credentials.filter((c) => isAbnormalCredentialName(c.name))
 
