@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import Store from 'electron-store'
 import { spawn, ChildProcess } from 'child_process'
 import crypto from 'crypto'
@@ -207,6 +207,44 @@ ipcMain.handle('test-connection', async (_event, url: string, apiKey: string) =>
     return { ok: false, error: String(err) }
   }
 })
+
+// ─── 업데이트 체크 (GitHub Releases) ────────────────────────────
+
+interface UpdateInfo {
+  available: boolean
+  currentVersion: string
+  latestVersion: string
+  releaseUrl: string
+}
+
+let cachedUpdateInfo: UpdateInfo | null = null
+
+async function checkForUpdates(): Promise<UpdateInfo> {
+  const currentVersion = app.getVersion()
+  const releaseUrl = 'https://github.com/team-datapopcorn/n8n-admin/releases/latest'
+  if (cachedUpdateInfo !== null) return cachedUpdateInfo
+  try {
+    const res = await fetch('https://api.github.com/repos/team-datapopcorn/n8n-admin/releases/latest', {
+      headers: { 'User-Agent': 'n8n-admin-desktop' },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) {
+      cachedUpdateInfo = { available: false, currentVersion, latestVersion: currentVersion, releaseUrl }
+      return cachedUpdateInfo
+    }
+    const data = await res.json() as { tag_name?: string; html_url?: string }
+    const latestVersion = (data.tag_name ?? '').replace(/^v/, '')
+    const available = latestVersion !== '' && latestVersion !== currentVersion
+    cachedUpdateInfo = { available, currentVersion, latestVersion, releaseUrl: data.html_url ?? releaseUrl }
+    return cachedUpdateInfo
+  } catch {
+    cachedUpdateInfo = { available: false, currentVersion, latestVersion: currentVersion, releaseUrl }
+    return cachedUpdateInfo
+  }
+}
+
+ipcMain.handle('check-for-updates', () => checkForUpdates())
+ipcMain.handle('open-external-url', (_event, url: string) => shell.openExternal(url))
 
 // App lifecycle
 app.whenReady().then(async () => {

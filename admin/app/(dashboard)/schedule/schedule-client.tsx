@@ -56,7 +56,7 @@ interface LargeResponse { totalWorkflows: number; largeCount: number; threshold:
 
 interface CleanupResponse {
   ok: boolean
-  results: { serverId: string; renamed: { oldName: string; newName: string; method: string }[]; errors: { name: string }[] }[]
+  results: { serverId: string; renamed: { oldName: string; newName: string; method: string }[]; errors: { name: string; error?: string }[] }[]
 }
 
 // ─── 유틸 ──────────────────────────────────────────────────
