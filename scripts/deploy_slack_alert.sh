@@ -196,23 +196,17 @@ print(json.dumps(wf, ensure_ascii=False))
   fi
 }
 
-# Cloud 서버
-deploy_to_server \
-  "https://datapopcorn.app.n8n.cloud" \
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNmNkOTRjMi0zNjRmLTRmY2ItODhlNy0xMTg4OTgwMDBhYjciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGExMjJjMDEtZjVlNi00ZTY1LWJmZDQtMzcwZDE3OTkwNDY1IiwiaWF0IjoxNzcwNjQ2MDQ2fQ.JTv8Pm7lUTcpieFNzD5CU5xYG6CVbthUnJcgbx3gm3I" \
-  "☁️ Cloud (datapopcorn.app.n8n.cloud)"
+# 서버 설정: .env 파일에 아래 변수를 추가하거나, 아래 값을 직접 수정하세요.
+# SERVER_URL, SERVER_API_KEY 는 .env.example 참고
 
-# GCP VM 서버
-deploy_to_server \
-  "https://n8n.datapopcorn.win" \
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MmQ3Y2ZhZi04ZGY4LTQyMWUtYTdlNC02NDE4OWQ5MThmYmUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcyNzA3NjgxfQ.iFHJt9zOsO1_mmarHDMxeI5YKCj0Way_jTkpkcXeWEI" \
-  "🖥️ GCP VM (n8n.datapopcorn.win)"
+SERVER1_URL="${SERVER_URL:?SERVER_URL 환경변수를 .env에 설정하세요}"
+SERVER1_API_KEY="${SERVER_API_KEY:?SERVER_API_KEY 환경변수를 .env에 설정하세요}"
+SERVER1_NAME="${SERVER_NAME:-My n8n Server}"
 
-# Railway 서버
-deploy_to_server \
-  "https://n8n.datapopcorn.xyz" \
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxZjQ4MTFkZS01NWM0LTQ2ZmItYTkwOS01NjkxMzQ2MzMzOWYiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzUyMzg5OTQ5fQ.YlFFfI2ub9hTg8TR77WSroR6iUhRMj0i_yU3cM0rc3k" \
-  "🚂 Railway (n8n.datapopcorn.xyz)"
+deploy_to_server "$SERVER1_URL" "$SERVER1_API_KEY" "$SERVER1_NAME"
+
+# 서버가 여러 개라면 아래 블록을 복사해서 추가하세요.
+# deploy_to_server "${SERVER2_URL}" "${SERVER2_API_KEY}" "${SERVER2_NAME:-Server 2}"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
