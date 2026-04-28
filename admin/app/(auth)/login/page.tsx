@@ -55,7 +55,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">n8n Admin</CardTitle>
-          <CardDescription>데이터팝콘 서버 관리 대시보드</CardDescription>
+          <CardDescription>n8n 서버 관리 대시보드</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

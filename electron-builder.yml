@@ -1,4 +1,4 @@
-appId: com.datapopcorn.n8n-admin
+appId: com.n8n-admin.app
 productName: n8n Admin
 directories:
   output: dist
