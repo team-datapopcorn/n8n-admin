@@ -213,7 +213,11 @@ export default function ScheduleClient({ servers }: { servers: ServerInfo[] }) {
       setLastCleanup(result)
       const r = result.results[0]
       if (r) {
-        toast.success(`네이밍: AI ${r.renamed.filter((x) => x.method === 'ai').length}건, 정규화 ${r.renamed.filter((x) => x.method === 'normalize').length}건`)
+        if (r.errors.length > 0) {
+          toast.error(`오류 ${r.errors.length}건: ${r.errors[0].error ?? r.errors[0].name}`)
+        } else {
+          toast.success(`네이밍: AI ${r.renamed.filter((x) => x.method === 'ai').length}건, 정규화 ${r.renamed.filter((x) => x.method === 'normalize').length}건`)
+        }
       }
       qc.invalidateQueries({ queryKey: ['naming-violations', server] })
     },

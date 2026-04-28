@@ -93,6 +93,11 @@ export async function deleteWorkflow(server: ServerConfig, id: string): Promise<
 }
 
 export async function updateWorkflow(server: ServerConfig, id: string, workflow: N8nWorkflow): Promise<N8nWorkflow> {
+  const { name, connections, staticData } = workflow
+  const { binaryMode: _, ...settings } = (workflow.settings ?? {}) as Record<string, unknown>
+  const nodes = ((workflow.nodes ?? []) as Record<string, unknown>[]).map(
+    ({ cid: _c, creator: _cr, ...node }) => node
+  )
   const res = await fetch(`${server.url}/api/v1/workflows/${id}`, {
     method: 'PUT',
     headers: {
@@ -100,7 +105,7 @@ export async function updateWorkflow(server: ServerConfig, id: string, workflow:
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(workflow),
+    body: JSON.stringify({ name, nodes, connections, settings, staticData }),
   })
   if (!res.ok) throw new Error(`Failed to update workflow: ${res.status}`)
   return res.json()
