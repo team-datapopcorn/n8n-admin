@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { LayoutDashboard, Workflow, Users, Key, Server, Settings, LogOut, Calendar } from 'lucide-react'
+import { LayoutDashboard, Workflow, Users, Key, Server, Settings, LogOut, Calendar, ArrowUpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react'
 
 const BASE_NAV = [
   { href: '/',            label: '대시보드',   icon: LayoutDashboard },
@@ -19,6 +20,19 @@ const HOSTING_NAV = { href: '/hosting', label: '인프라', icon: Server }
 
 const SETTINGS_NAV = { href: '/settings', label: '설정', icon: Settings }
 
+interface UpdateInfo {
+  available: boolean
+  currentVersion: string
+  latestVersion: string
+  releaseUrl: string
+}
+
+interface ElectronAPI {
+  checkForUpdates: () => Promise<UpdateInfo>
+  openExternalUrl: (url: string) => Promise<void>
+  isElectron: boolean
+}
+
 interface SidebarProps {
   showHosting: boolean
 }
@@ -28,6 +42,14 @@ export default function Sidebar({ showHosting }: SidebarProps) {
   const nav = [...BASE_NAV, SCHEDULE_NAV]
   if (showHosting) nav.push(HOSTING_NAV)
   nav.push(SETTINGS_NAV)
+
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+
+  useEffect(() => {
+    const api = (window as unknown as { electronAPI?: ElectronAPI }).electronAPI
+    if (!api?.checkForUpdates) return
+    api.checkForUpdates().then(setUpdateInfo).catch(() => {})
+  }, [])
 
   return (
     <aside className="flex flex-col w-56 min-h-screen border-r bg-background px-3 py-4">
@@ -64,6 +86,25 @@ export default function Sidebar({ showHosting }: SidebarProps) {
         <LogOut size={16} />
         로그아웃
       </Button>
+
+      {updateInfo && (
+        <div className="px-2 pt-2 border-t">
+          {updateInfo.available ? (
+            <button
+              onClick={() => {
+                const api = (window as unknown as { electronAPI?: ElectronAPI }).electronAPI
+                api?.openExternalUrl(updateInfo.releaseUrl)
+              }}
+              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 transition-colors w-full"
+            >
+              <ArrowUpCircle size={13} />
+              <span>v{updateInfo.latestVersion} 업데이트</span>
+            </button>
+          ) : (
+            <p className="text-xs text-muted-foreground/60 px-1">v{updateInfo.currentVersion}</p>
+          )}
+        </div>
+      )}
     </aside>
   )
 }

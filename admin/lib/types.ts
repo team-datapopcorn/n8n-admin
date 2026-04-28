@@ -27,6 +27,7 @@ export interface N8nWorkflow {
   nodes?: unknown[]
   connections?: unknown
   settings?: unknown
+  staticData?: unknown
   tags?: { id: string; name: string }[]
   shared?: { role: string; projectId: string }[]
   versionId?: string

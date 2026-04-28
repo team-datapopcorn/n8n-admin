@@ -10,7 +10,7 @@
 
 import { ServerConfig, N8nWorkflow, N8nCredential } from './types'
 import { listWorkflows, getWorkflow, updateWorkflow, listCredentials } from './n8n-client'
-import { validateName } from './naming-convention'
+import { validateName, suggestFix } from './naming-convention'
 
 // ─── 이름 분류 함수 ──────────────────────────────────────────────
 
@@ -50,12 +50,16 @@ async function askGemini(apiKey: string, nodeTypes: string[], currentName: strin
   const prompt = `다음은 n8n 자동화 워크플로우의 노드 목록입니다:
 ${nodeTypes.slice(0, 20).join(', ')}
 
-이 워크플로우의 기능을 추측하여 간결한 한국어 이름을 1개만 제안해주세요.
-- 최대 20자
-- 동사+목적어 형식 권장 (예: "Slack 알림 자동 발송", "GitHub 이슈 Notion 동기화")
+이 워크플로우의 이름을 아래 컨벤션에 맞게 1개만 제안해주세요.
+
+컨벤션: [프로젝트명] 기능 설명
+- 프로젝트명: 워크플로우가 연동하는 주요 서비스 또는 업무 도메인 (예: Slack, GitHub, Notion, 인사, 정산)
+- 기능 설명: 동사+목적어 형식, 최대 15자
+- 전체 최대 25자
+- 예시: "[Slack] 알림 자동 발송", "[GitHub] 이슈 Notion 동기화", "[인사] 입퇴사 처리 알림"
 - 이름만 출력, 설명 없이`
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`
 
   const res = await fetch(url, {
     method: 'POST',
@@ -110,26 +114,31 @@ export async function runAutoCleanup(
     }
   }
 
-  // 3. 워크플로우 분류
+  // 3. 컨벤션 위반 워크플로우 분류
   const aiCandidates: N8nWorkflow[] = []
-  const normalizeCandidates: { wf: N8nWorkflow; newName: string }[] = []
+  const suggestCandidates: { wf: N8nWorkflow; newName: string }[] = []
 
   for (const wf of workflows as N8nWorkflow[]) {
+    const { valid } = validateName(wf.name)
+    if (valid) {
+      result.skipped.push({ id: wf.id, name: wf.name, reason: '컨벤션 준수' })
+      continue
+    }
     if (isDefaultName(wf.name)) {
+      // 기본 이름(My workflow N 등) → Gemini로 [프로젝트명] 기능 설명 생성
       aiCandidates.push(wf)
-    } else if (isCopyOrVersion(wf.name)) {
-      const newName = cleanName(wf.name)
-      if (newName && newName !== wf.name) {
-        normalizeCandidates.push({ wf, newName })
-      } else {
-        result.skipped.push({ id: wf.id, name: wf.name, reason: '정규화 후 이름 동일' })
-      }
     } else {
-      result.skipped.push({ id: wf.id, name: wf.name, reason: '정상 이름' })
+      // 그 외 위반 → 화면 제안과 동일한 suggestFix() 적용
+      const newName = suggestFix(wf.name)
+      if (newName && newName !== wf.name) {
+        suggestCandidates.push({ wf, newName })
+      } else {
+        result.skipped.push({ id: wf.id, name: wf.name, reason: '제안 이름 동일' })
+      }
     }
   }
 
-  // 4. [A] AI 이름 부여 (Gemini, rate limit 대응: 4s 간격)
+  // 4. [A] 기본 이름 → Gemini AI로 [프로젝트명] 기능 설명 생성 (4s 간격)
   for (let i = 0; i < aiCandidates.length; i++) {
     const wf = aiCandidates[i]
     try {
@@ -153,8 +162,8 @@ export async function runAutoCleanup(
     }
   }
 
-  // 5. [B] 정규화 (복사/버전 마커 제거)
-  for (const { wf, newName } of normalizeCandidates) {
+  // 5. [B] 그 외 위반 → 화면 제안(suggestFix) 그대로 적용
+  for (const { wf, newName } of suggestCandidates) {
     try {
       if (dryRun) {
         result.renamed.push({ id: wf.id, oldName: wf.name, newName, method: 'normalize' })

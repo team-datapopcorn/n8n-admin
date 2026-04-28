@@ -10,7 +10,10 @@
 import fs from 'fs'
 import path from 'path'
 
-const CONFIG_PATH = path.join(process.cwd(), '.config', 'keys.json')
+// Electron: write to userData dir (ELECTRON_CONFIG_PATH's parent) to avoid read-only app bundle
+const CONFIG_PATH = process.env.ELECTRON_CONFIG_PATH
+  ? path.join(path.dirname(process.env.ELECTRON_CONFIG_PATH), '.config', 'keys.json')
+  : path.join(process.cwd(), '.config', 'keys.json')
 
 export interface AppConfig {
   geminiApiKey?: string
