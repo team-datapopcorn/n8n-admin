@@ -3,6 +3,7 @@ export interface ElectronAPI {
   saveServers: (servers: ElectronServer[]) => Promise<void>
   getSessionPassword: () => Promise<string>
   testConnection: (url: string, apiKey: string) => Promise<{ ok: boolean; error?: string }>
+  resetSession: () => Promise<void>
   isElectron: boolean
 }
 

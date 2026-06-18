@@ -245,6 +245,7 @@ async function checkForUpdates(): Promise<UpdateInfo> {
 
 ipcMain.handle('check-for-updates', () => checkForUpdates())
 ipcMain.handle('open-external-url', (_event, url: string) => shell.openExternal(url))
+ipcMain.handle('reset-session', () => restartNextServer())
 
 // App lifecycle
 app.whenReady().then(async () => {

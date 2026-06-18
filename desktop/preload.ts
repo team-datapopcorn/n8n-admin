@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   testConnection: (url: string, apiKey: string) => ipcRenderer.invoke('test-connection', url, apiKey),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  resetSession: () => ipcRenderer.invoke('reset-session'),
   isElectron: true,
 })

@@ -27,12 +27,34 @@ n8n 서버를 위한 관리 도구 키트. 워크플로우 백업·복원, 유�
 
 ### 설치
 
-1. [최신 릴리즈](https://github.com/team-datapopcorn/n8n-admin/releases)에서 `n8n.Admin-1.0.0-arm64.dmg` 다운로드
+1. [최신 릴리즈](https://github.com/team-datapopcorn/n8n-admin/releases)에서 `n8n-Admin-x.x.x-mac-arm64.dmg` 다운로드
 2. DMG를 열고 `n8n Admin`을 Applications 폴더로 드래그
 3. 앱 실행 → 서버 URL과 API 키 입력 → 끝!
 
-> macOS에서 "확인되지 않은 개발자" 경고가 나타나면:
-> 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기" 클릭
+### "확인되지 않은 개발자" 경고 해결
+
+macOS Gatekeeper는 Apple 공증을 받지 않은 앱을 차단합니다. 아래 두 방법 중 하나로 해결하세요.
+
+**방법 1 — 터미널 (권장, 30초)**
+
+앱을 Applications에 옮긴 뒤 터미널에서 실행:
+
+```bash
+xattr -rd com.apple.quarantine /Applications/n8\ Admin.app
+```
+
+이후 앱을 평소처럼 더블클릭하면 바로 실행됩니다.
+
+**방법 2 — 시스템 설정 (GUI)**
+
+1. Applications에서 앱을 더블클릭 → 경고창에서 **취소** 클릭
+2. **시스템 설정** → **개인 정보 보호 및 보안** 으로 이동
+3. 하단 "n8n Admin"이 차단되었다는 메시지 옆 **그래도 열기** 클릭
+4. 비밀번호 입력 후 확인
+
+> **왜 이런 경고가 뜨나요?**
+> Apple Developer Program($99/년)에 등록된 개발자만 앱에 공식 서명을 할 수 있습니다.
+> 이 앱은 강의용으로 배포되며 코드는 [GitHub에 공개](https://github.com/team-datapopcorn/n8n-admin)되어 있어 직접 확인하실 수 있습니다.
 
 ### 직접 빌드
 
