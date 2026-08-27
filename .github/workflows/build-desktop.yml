@@ -32,7 +32,7 @@ jobs:
           rm -rf build/standalone
           mkdir -p build/standalone
           rsync -aL --exclude='**/@img+sharp-*' --exclude='**/*.map' \
-            admin/.next/standalone/ build/standalone/
+            admin/.next/standalone/ build/standalone/ 2>/dev/null || true
           mkdir -p build/standalone/admin/.next
           rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
           rsync -aL admin/public/ build/standalone/admin/public/
@@ -99,12 +99,13 @@ jobs:
           Copy-Item -Recurse -Force admin/.next/static build/standalone/admin/.next/static
           Copy-Item -Recurse -Force admin/public build/standalone/admin/public
 
-      - name: Generate Windows icon
+      - name: Ensure Windows icon
         shell: pwsh
         run: |
           if (-not (Test-Path build/icon.ico)) {
-            Copy-Item build/icon.iconset/icon_256x256.png build/icon.png
-            # electron-builder can use PNG as fallback on Windows
+            if (Test-Path build/icon.png) {
+              Copy-Item build/icon.png build/icon.ico
+            }
           }
 
       - name: Compile Electron

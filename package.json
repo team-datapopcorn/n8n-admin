@@ -6,6 +6,8 @@
   "packageManager": "pnpm@10.28.2",
   "main": "desktop/dist/main.js",
   "dependencies": {
+    "electron-store": "^8.2.0",
+    "get-port": "^7.2.0",
     "next": "16.1.6"
   },
   "scripts": {
@@ -25,10 +27,6 @@
     "url": "https://github.com/team-datapopcorn/n8n-admin/issues"
   },
   "homepage": "https://github.com/team-datapopcorn/n8n-admin#readme",
-  "dependencies": {
-    "electron-store": "^8.2.0",
-    "get-port": "^7.2.0"
-  },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "electron": "^41.0.3",

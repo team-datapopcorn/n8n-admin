@@ -32,8 +32,8 @@ if [ ${#MISSING[@]} -gt 0 ]; then
 fi
 
 NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_VER" -lt 18 ]; then
-  echo "Node.js 18 이상이 필요합니다. 현재: $(node -v)"
+if [ "$NODE_VER" -lt 20 ]; then
+  echo "Node.js 20 이상이 필요합니다. 현재: $(node -v)"
   exit 1
 fi
 echo "Node.js $(node -v), pnpm $(pnpm -v), jq $(jq --version 2>&1 | head -1) 확인 완료"

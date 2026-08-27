@@ -138,6 +138,9 @@ server2) N8N_URL="${SERVER2_URL:-}"; API_KEY="${SERVER2_API_KEY:-}" ;;
 | `list-credentials.sh` | 크레덴셜 목록 | `./scripts/list-credentials.sh server1` |
 | `delete-credential.sh` | 크레덴셜 삭제 | `./scripts/delete-credential.sh server1 abc123` |
 | `cleanup-workflows.sh` | 중복/불필요 워크플로우 정리 | `./scripts/cleanup-workflows.sh server1 --execute` |
+| `rename-workflows.sh` | 네이밍 컨벤션 검사/일괄 변경 | `./scripts/rename-workflows.sh server1 --execute` |
+| `offboard-user.sh` | 퇴사자 워크플로우·크레덴셜 일괄 인계 | `./scripts/offboard-user.sh server1 <fromEmail> <toEmail>` |
+| `register-error-triggers.sh` | 에러 트리거 일괄 등록 | `./scripts/register-error-triggers.sh server1 <errorHandlerWfId>` |
 | `migration-checklist.sh` | 서버 이관 체크리스트 | `./scripts/migration-checklist.sh server1 server2` |
 | `gcp-vm.sh` | GCP VM 제어 | `./scripts/gcp-vm.sh status` |
 

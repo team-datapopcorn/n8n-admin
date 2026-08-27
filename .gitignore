@@ -13,6 +13,7 @@ server5/
 
 # Node.js
 node_modules/
+package-lock.json
 admin/.next/
 admin/node_modules/
 admin/.env.local
@@ -25,5 +26,6 @@ desktop/dist/
 dist/
 build/standalone/
 *.dmg
+*.exe
 build/icon.iconset/
 .vercel

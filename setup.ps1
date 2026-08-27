@@ -22,8 +22,8 @@ if ($Missing.Count -gt 0) {
 }
 
 $NodeVer = [int]((node -v) -replace 'v' -split '\.')[0]
-if ($NodeVer -lt 18) {
-    Write-Host "Node.js 18 이상이 필요합니다. 현재: $(node -v)" -ForegroundColor Red
+if ($NodeVer -lt 20) {
+    Write-Host "Node.js 20 이상이 필요합니다. 현재: $(node -v)" -ForegroundColor Red
     exit 1
 }
 Write-Host "Node.js $(node -v), pnpm $(pnpm -v) 확인 완료" -ForegroundColor Green
