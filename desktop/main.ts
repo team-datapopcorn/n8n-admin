@@ -99,7 +99,8 @@ async function startNextServer(): Promise<number> {
       ELECTRON_CONFIG_PATH: configPath,
       ADMIN_PASSWORD: sessionPassword,
       NEXTAUTH_SECRET: store.get('nextauthSecret'),
-      NEXTAUTH_URL: `http://localhost:${port}`,
+      // 창은 127.0.0.1로 연다. proxy.ts가 NEXTAUTH_URL 호스트와 다른 요청을 404로 막으므로 반드시 같은 호스트를 쓴다.
+      NEXTAUTH_URL: `http://127.0.0.1:${port}`,
       AUTH_TRUST_HOST: 'true',
     },
     cwd: standaloneDir,

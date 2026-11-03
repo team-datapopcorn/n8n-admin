@@ -21,10 +21,15 @@ mkdir -p build/standalone
 
 # rsync -aL로 심볼릭 링크를 역참조하여 실제 파일로 복사
 # (electron-builder는 심볼릭 링크를 처리하지 못함)
+# Next 16.4+는 standalone/server.js(평면 구조)로, 이전 버전은 standalone/admin/server.js로 출력한다.
+# 데스크톱 앱(main.ts)은 standalone/admin/server.js를 기대하므로 평면 구조면 admin/ 아래로 옮긴다.
+if [ -f admin/.next/standalone/server.js ]; then DEST=build/standalone/admin/; else DEST=build/standalone/; fi
+mkdir -p "$DEST"
 rsync -aL \
   --exclude='**/@img+sharp-*' \
   --exclude='**/*.map' \
-  admin/.next/standalone/ build/standalone/ 2>/dev/null || true
+  admin/.next/standalone/ "$DEST" 2>/dev/null || true
+test -f build/standalone/admin/server.js || { echo "오류: build/standalone/admin/server.js 없음"; exit 1; }
 mkdir -p build/standalone/admin/.next
 rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
 rsync -aL admin/public/ build/standalone/admin/public/

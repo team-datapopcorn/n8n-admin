@@ -35,11 +35,15 @@ jobs:
         run: |
           rm -rf build/standalone
           mkdir -p build/standalone
+          # Next 16.4+는 standalone/server.js(평면), 이전은 standalone/admin/server.js. 앱은 후자를 기대한다.
+          if [ -f admin/.next/standalone/server.js ]; then DEST=build/standalone/admin/; else DEST=build/standalone/; fi
+          mkdir -p "$DEST"
           rsync -aL --exclude='**/@img+sharp-*' --exclude='**/*.map' \
-            admin/.next/standalone/ build/standalone/ 2>/dev/null || true
+            admin/.next/standalone/ "$DEST" 2>/dev/null || true
           mkdir -p build/standalone/admin/.next
           rsync -aL admin/.next/static/ build/standalone/admin/.next/static/
           rsync -aL admin/public/ build/standalone/admin/public/
+          test -f build/standalone/admin/server.js || { echo "::error::build/standalone/admin/server.js 없음"; exit 1; }
 
       - name: Hoist pnpm modules
         run: |
@@ -100,10 +104,13 @@ jobs:
         run: |
           Remove-Item -Recurse -Force build/standalone -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path build/standalone -Force | Out-Null
-          Copy-Item -Recurse -Force admin/.next/standalone/* build/standalone/
+          if (Test-Path admin/.next/standalone/server.js) { $dest = 'build/standalone/admin' } else { $dest = 'build/standalone' }
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item -Recurse -Force admin/.next/standalone/* $dest/
           New-Item -ItemType Directory -Path build/standalone/admin/.next -Force | Out-Null
           Copy-Item -Recurse -Force admin/.next/static build/standalone/admin/.next/static
           Copy-Item -Recurse -Force admin/public build/standalone/admin/public
+          if (-not (Test-Path build/standalone/admin/server.js)) { Write-Error 'build/standalone/admin/server.js 없음'; exit 1 }
 
       - name: Ensure Windows icon
         shell: pwsh
