@@ -65,7 +65,7 @@ for EMAIL in "${EMAILS[@]}"; do
     "$N8N_URL/api/v1/users")
 
   HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-  BODY=$(echo "$RESPONSE" | head -n -1)
+  BODY=$(echo "$RESPONSE" | sed '$d')
 
   if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 201 ]; then
     echo "  초대 완료: $EMAIL"

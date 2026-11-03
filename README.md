@@ -306,3 +306,14 @@ n8n 튜토리얼, 실습 자료, 강의 슬라이드를 만듭니다.
 - **Shell Scripts:** bash, jq
 - **Admin 대시보드 (직접 빌드):** Node.js 20+, pnpm
 - **Claude Code 스킬:** [Claude Code](https://claude.ai/claude-code) + n8n MCP 서버 연결
+- **n8n 버전:** 1.x, 2.x, 3.x (v1.2.0에서 n8n 3.0.0 실서버로 검증)
+
+### n8n 2.0+ 변경점 대응 (v1.2.0)
+
+n8n 2.0부터 "활성화(Activate)"가 "게시(Publish)"로 바뀌고, 공개 API 본문 검증이 엄격해졌습니다. v1.2.0은 아래처럼 동작합니다.
+
+- 워크플로우 복사·import·이름 정리·에러 워크플로우 지정은 쓰기 가능한 필드만 보냅니다. (예전 버전은 n8n 2.0+에서 `request/body/active is read-only` 400 오류로 실패했습니다.)
+- 이름 변경과 설정 변경은 `publishIfActive=false`로 저장합니다. 그래서 누군가 작업 중인 **미게시 초안이 관리 도구 때문에 라이브로 올라가지 않습니다.** 이름과 설정(에러 워크플로우 등)은 바로 반영됩니다.
+- 새로 만든 워크플로우 게시는 `/publish`를 쓰고, 구버전 서버는 `/activate`로 자동 전환합니다.
+- 에러 워크플로우로 지정할 워크플로우는 먼저 **게시**되어 있어야 합니다. (n8n 2.0+ 규칙)
+- 유저 목록은 `includeRole=true`로 조회해서 owner/admin이 삭제·휴면 정리 대상에서 빠지도록 했습니다.

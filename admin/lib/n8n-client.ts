@@ -1,13 +1,85 @@
 import { ServerConfig, N8nWorkflow, N8nUser, N8nCredential, N8nProject, N8nExecution } from './types'
 
+// ─── n8n 2.x/3.x 공개 API 호환 ────────────────────────────────────────────
+// n8n 2.0부터 PUT/POST /workflows 본문 검증이 strict해져서, GET으로 받은 객체를
+// 그대로 보내면 active·activeVersionId·tags 같은 읽기 전용 필드 때문에 400이 난다.
+// 쓰기 가능한 필드만 골라서 보낸다.
+const WRITABLE_NODE_KEYS = [
+  'id', 'name', 'webhookId', 'disabled', 'notesInFlow', 'notes', 'type', 'typeVersion',
+  'executeOnce', 'alwaysOutputData', 'retryOnFail', 'maxTries', 'waitBetweenTries',
+  'continueOnFail', 'onError', 'position', 'parameters', 'credentials',
+] as const
+
+const WRITABLE_SETTINGS: Record<string, readonly string[] | null> = {
+  saveExecutionProgress: null,
+  saveManualExecutions: null,
+  saveDataErrorExecution: ['all', 'none'],
+  saveDataSuccessExecution: ['all', 'none'],
+  executionTimeout: null,
+  errorWorkflow: null,
+  timezone: null,
+  executionOrder: null,
+  callerPolicy: ['any', 'none', 'workflowsFromAList', 'workflowsFromSameOwner'],
+  callerIds: null,
+  timeSavedMode: ['fixed', 'dynamic'],
+  timeSavedPerExecution: null,
+  redactionPolicy: ['none', 'non-manual', 'manual-only', 'all'],
+  availableInMCP: null,
+}
+
+function pick(obj: Record<string, unknown>, keys: readonly string[]) {
+  const out: Record<string, unknown> = {}
+  for (const k of keys) if (obj[k] !== undefined && obj[k] !== null) out[k] = obj[k]
+  return out
+}
+
+export function toWritableWorkflow(workflow: N8nWorkflow): Record<string, unknown> {
+  const raw = workflow as unknown as Record<string, unknown>
+  const settingsIn = (workflow.settings ?? {}) as Record<string, unknown>
+  const settings: Record<string, unknown> = {}
+  for (const [k, allowed] of Object.entries(WRITABLE_SETTINGS)) {
+    const v = settingsIn[k]
+    if (v === undefined || v === null) continue
+    if (allowed && !allowed.includes(String(v))) continue
+    settings[k] = v
+  }
+  const body: Record<string, unknown> = {
+    name: workflow.name,
+    nodes: ((workflow.nodes ?? []) as Record<string, unknown>[]).map((n) => pick(n, WRITABLE_NODE_KEYS)),
+    connections: workflow.connections ?? {},
+    settings,
+  }
+  if (workflow.staticData != null) body.staticData = workflow.staticData
+  if (typeof raw.description === 'string') body.description = raw.description
+  if (Array.isArray(raw.nodeGroups) && raw.nodeGroups.length) body.nodeGroups = raw.nodeGroups
+  return body
+}
+
+/** n8n 2.0+: activeVersionId가 있으면 게시(published) 상태. 1.x는 active 필드. */
+export function isPublished(workflow: Pick<N8nWorkflow, 'active' | 'activeVersionId'>): boolean {
+  if (workflow.activeVersionId !== undefined) return workflow.activeVersionId !== null
+  return Boolean(workflow.active)
+}
+
+function normalizeWorkflow<T extends N8nWorkflow>(wf: T): T {
+  return { ...wf, active: isPublished(wf) }
+}
+
+async function n8nError(res: Response, what: string): Promise<Error> {
+  let detail = ''
+  try { detail = (await res.text()).slice(0, 300) } catch {}
+  return new Error(`${what}: ${res.status}${detail ? ` ${detail}` : ''}`)
+}
+
 async function fetchAllPages<T>(url: string, apiKey: string): Promise<T[]> {
   const results: T[] = []
   let cursor: string | null = null
 
   do {
+    const sep = url.includes('?') ? '&' : '?'
     const pageUrl: string = cursor
-      ? `${url}?limit=100&cursor=${encodeURIComponent(cursor)}`
-      : `${url}?limit=100`
+      ? `${url}${sep}limit=100&cursor=${encodeURIComponent(cursor)}`
+      : `${url}${sep}limit=100`
 
     const res = await fetch(pageUrl, {
       headers: { 'X-N8N-API-KEY': apiKey, Accept: 'application/json' },
@@ -39,7 +111,8 @@ export async function healthCheck(server: ServerConfig): Promise<{ alive: boolea
 }
 
 export async function listWorkflows(server: ServerConfig): Promise<N8nWorkflow[]> {
-  return fetchAllPages<N8nWorkflow>(`${server.url}/api/v1/workflows`, server.apiKey)
+  const list = await fetchAllPages<N8nWorkflow>(`${server.url}/api/v1/workflows?excludePinnedData=true`, server.apiKey)
+  return list.map(normalizeWorkflow)
 }
 
 export async function listWorkflowsPage(
@@ -48,15 +121,15 @@ export async function listWorkflowsPage(
   cursor?: string,
 ): Promise<{ data: N8nWorkflow[]; nextCursor: string | null }> {
   const url = cursor
-    ? `${server.url}/api/v1/workflows?limit=${limit}&cursor=${encodeURIComponent(cursor)}`
-    : `${server.url}/api/v1/workflows?limit=${limit}`
+    ? `${server.url}/api/v1/workflows?excludePinnedData=true&limit=${limit}&cursor=${encodeURIComponent(cursor)}`
+    : `${server.url}/api/v1/workflows?excludePinnedData=true&limit=${limit}`
   const res = await fetch(url, {
     headers: { 'X-N8N-API-KEY': server.apiKey, Accept: 'application/json' },
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`n8n API error: ${res.status}`)
   const json = await res.json()
-  return { data: json.data ?? [], nextCursor: json.nextCursor ?? null }
+  return { data: (json.data ?? []).map(normalizeWorkflow), nextCursor: json.nextCursor ?? null }
 }
 
 export async function getWorkflow(server: ServerConfig, id: string): Promise<N8nWorkflow> {
@@ -65,12 +138,10 @@ export async function getWorkflow(server: ServerConfig, id: string): Promise<N8n
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`Failed to get workflow: ${res.status}`)
-  return res.json()
+  return normalizeWorkflow(await res.json())
 }
 
 export async function createWorkflow(server: ServerConfig, workflow: N8nWorkflow): Promise<N8nWorkflow> {
-  // import.sh 패턴: id, createdAt, updatedAt, versionId 제거
-  const { id: _id, createdAt: _c, updatedAt: _u, versionId: _v, ...body } = workflow
   const res = await fetch(`${server.url}/api/v1/workflows`, {
     method: 'POST',
     headers: {
@@ -78,9 +149,9 @@ export async function createWorkflow(server: ServerConfig, workflow: N8nWorkflow
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(toWritableWorkflow(workflow)),
   })
-  if (!res.ok) throw new Error(`Failed to create workflow: ${res.status}`)
+  if (!res.ok) throw await n8nError(res, 'Failed to create workflow')
   return res.json()
 }
 
@@ -92,27 +163,53 @@ export async function deleteWorkflow(server: ServerConfig, id: string): Promise<
   if (!res.ok) throw new Error(`Failed to delete workflow: ${res.status}`)
 }
 
-export async function updateWorkflow(server: ServerConfig, id: string, workflow: N8nWorkflow): Promise<N8nWorkflow> {
-  const { name, connections, staticData } = workflow
-  const { binaryMode: _, ...settings } = (workflow.settings ?? {}) as Record<string, unknown>
-  const nodes = ((workflow.nodes ?? []) as Record<string, unknown>[]).map(
-    ({ cid: _c, creator: _cr, ...node }) => node
-  )
-  const res = await fetch(`${server.url}/api/v1/workflows/${id}`, {
+/**
+ * 워크플로우 수정.
+ * n8n 2.0+에서는 게시된 워크플로우를 PUT하면 기본적으로 최신 초안이 바로 다시 게시된다.
+ * 관리 도구가 남의 미완성 초안을 의도치 않게 라이브로 올리지 않도록 기본값은 publishIfActive=false.
+ * (이름·설정 변경은 워크플로우 자체에 바로 반영된다)
+ */
+export async function updateWorkflow(
+  server: ServerConfig,
+  id: string,
+  workflow: N8nWorkflow,
+  options: { publishIfActive?: boolean } = {},
+): Promise<N8nWorkflow> {
+  const publish = options.publishIfActive ?? false
+  const init: RequestInit = {
     method: 'PUT',
     headers: {
       'X-N8N-API-KEY': server.apiKey,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ name, nodes, connections, settings, staticData }),
-  })
-  if (!res.ok) throw new Error(`Failed to update workflow: ${res.status}`)
-  return res.json()
+    body: JSON.stringify(toWritableWorkflow(workflow)),
+  }
+  let res = await fetch(`${server.url}/api/v1/workflows/${id}?publishIfActive=${publish}`, init)
+  if (res.status === 400) {
+    // n8n 1.x는 publishIfActive 쿼리를 모른다 → 쿼리 없이 재시도
+    const text = await res.clone().text()
+    if (/publishIfActive|unknown query/i.test(text)) {
+      res = await fetch(`${server.url}/api/v1/workflows/${id}`, init)
+    }
+  }
+  if (!res.ok) throw await n8nError(res, 'Failed to update workflow')
+  return normalizeWorkflow(await res.json())
+}
+
+/** 게시(1.x의 activate). 2.0+는 /publish, 구버전은 /activate로 폴백. */
+export async function publishWorkflow(server: ServerConfig, id: string): Promise<void> {
+  const headers = { 'X-N8N-API-KEY': server.apiKey, 'Content-Type': 'application/json' }
+  let res = await fetch(`${server.url}/api/v1/workflows/${id}/publish`, { method: 'POST', headers, body: '{}' })
+  if (res.status === 404 || res.status === 405) {
+    res = await fetch(`${server.url}/api/v1/workflows/${id}/activate`, { method: 'POST', headers })
+  }
+  if (!res.ok) throw await n8nError(res, 'Failed to publish workflow')
 }
 
 export async function listUsers(server: ServerConfig): Promise<N8nUser[]> {
-  const users = await fetchAllPages<N8nUser>(`${server.url}/api/v1/users`, server.apiKey)
+  // includeRole=true가 없으면 role이 빠져서 owner/admin 보호(삭제 방지·휴면 정리 제외)가 무력화된다
+  const users = await fetchAllPages<N8nUser>(`${server.url}/api/v1/users?includeRole=true`, server.apiKey)
   const now = Date.now()
   return users.map((u) => ({
     ...u,

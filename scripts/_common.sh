@@ -58,7 +58,10 @@ fetch_all() {
   local cursor=""
 
   while true; do
-    local url="$N8N_URL/api/v1/${endpoint}?limit=100${cursor:+&cursor=$cursor}"
+    # users는 includeRole=true가 없으면 role이 빠진다 (owner/admin 보호 로직이 무력화됨)
+    local query="limit=100"
+    [ "$endpoint" = "users" ] && query="includeRole=true&limit=100"
+    local url="$N8N_URL/api/v1/${endpoint}?${query}${cursor:+&cursor=$cursor}"
     local response
     response=$(curl -s -f \
       -H "X-N8N-API-KEY: $API_KEY" \
@@ -73,4 +76,40 @@ fetch_all() {
 
   cat "$tmp_file"
   rm -f "$tmp_file"
+}
+
+# ─── n8n 2.x/3.x 호환 ────────────────────────────────────────────────
+# n8n 2.0부터 POST/PUT /workflows 본문이 strict 검증이라 GET 결과를 그대로 보내면
+# active·activeVersionId·tags 등 읽기 전용 필드 때문에 400이 난다. 쓰기 가능한 필드만 남긴다.
+N8N_WRITABLE_JQ='
+  def nn: with_entries(select(.value != null));
+  {
+    name,
+    nodes: ((.nodes // []) | map({id, name, webhookId, disabled, notesInFlow, notes, type, typeVersion,
+      executeOnce, alwaysOutputData, retryOnFail, maxTries, waitBetweenTries, continueOnFail, onError,
+      position, parameters, credentials} | nn)),
+    connections: (.connections // {}),
+    settings: (((.settings // {}) | with_entries(select(.value != null and (.key as $k |
+      ["saveExecutionProgress","saveManualExecutions","saveDataErrorExecution","saveDataSuccessExecution",
+       "executionTimeout","errorWorkflow","timezone","executionOrder","callerPolicy","callerIds",
+       "timeSavedMode","timeSavedPerExecution","redactionPolicy","availableInMCP"] | index($k)))))
+      | (if (.saveDataErrorExecution // "all") as $v | ["all","none"] | index($v) then . else del(.saveDataErrorExecution) end)
+      | (if (.saveDataSuccessExecution // "all") as $v | ["all","none"] | index($v) then . else del(.saveDataSuccessExecution) end)),
+    staticData,
+    description,
+    nodeGroups: (if (.nodeGroups | type) == "array" and (.nodeGroups | length) > 0 then .nodeGroups else null end)
+  } | nn'
+
+# 워크플로우 게시 (n8n 1.x의 activate). 2.0+는 /publish, 구버전은 /activate로 폴백.
+# 사용: publish_workflow <URL> <API_KEY> <WF_ID>  → HTTP 코드 출력
+publish_workflow() {
+  local url="$1" key="$2" id="$3" code
+  code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    -H "X-N8N-API-KEY: $key" -H "Content-Type: application/json" -d '{}' \
+    "$url/api/v1/workflows/$id/publish")
+  if [ "$code" = "404" ] || [ "$code" = "405" ]; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+      -H "X-N8N-API-KEY: $key" "$url/api/v1/workflows/$id/activate")
+  fi
+  echo "$code"
 }

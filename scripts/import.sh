@@ -32,20 +32,20 @@ echo "서버: $N8N_URL"
 echo "파일: $WF_FILE"
 echo ""
 
-# id 필드 제거 후 import (새 워크플로우로 생성)
-WF_JSON=$(jq 'del(.id, .createdAt, .updatedAt, .versionId)' "$WF_FILE")
+# 쓰기 가능한 필드만 남겨서 import (새 워크플로우로 생성, n8n 2.x/3.x strict 검증 대응)
+WF_JSON=$(jq "$N8N_WRITABLE_JQ" "$WF_FILE")
 
-RESPONSE=$(curl -s -w "\n%{http_code}" \
+RESPONSE=$(printf '%s' "$WF_JSON" | curl -s -w "\n%{http_code}" \
   -X POST \
   -H "X-N8N-API-KEY: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d "$WF_JSON" \
+  -d @- \
   "$N8N_URL/api/v1/workflows")
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
-if [ "$HTTP_CODE" -eq 201 ]; then
+if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
   NEW_ID=$(echo "$BODY" | jq -r '.id')
   NEW_NAME=$(echo "$BODY" | jq -r '.name')
   echo "완료: '$NEW_NAME' 워크플로우가 생성되었습니다. (ID: $NEW_ID)"

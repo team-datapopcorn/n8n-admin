@@ -85,7 +85,7 @@ for ID in $(echo "$MISSING" | jq -r '.[].id'); do
       "id": "error-trigger-auto",
       "name": "Error Trigger"
     }]
-  ')
+  ' | jq "$N8N_WRITABLE_JQ")
 
   # 워크플로우 업데이트
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -93,7 +93,7 @@ for ID in $(echo "$MISSING" | jq -r '.[].id'); do
     -H "X-N8N-API-KEY: $API_KEY" \
     -H "Content-Type: application/json" \
     -d "$UPDATED" \
-    "$N8N_URL/api/v1/workflows/$ID")
+    "$N8N_URL/api/v1/workflows/$ID?publishIfActive=false")
 
   if [ "$HTTP_CODE" = "200" ]; then
     echo "추가됨"

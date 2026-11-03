@@ -181,14 +181,14 @@ while IFS='|' read -r WF_ID OLD_NAME NEW_NAME; do
     "$N8N_URL/api/v1/workflows/$WF_ID") || { echo "  실패 (조회 오류): $OLD_NAME"; FAILED=$((FAILED + 1)); continue; }
 
   # 이름만 변경하여 업데이트
-  UPDATED=$(echo "$WF_DATA" | jq --arg name "$NEW_NAME" '.name = $name')
+  UPDATED=$(echo "$WF_DATA" | jq --arg name "$NEW_NAME" '.name = $name' | jq "$N8N_WRITABLE_JQ")
 
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
     -X PATCH \
     -H "X-N8N-API-KEY: $API_KEY" \
     -H "Content-Type: application/json" \
     -d "$UPDATED" \
-    "$N8N_URL/api/v1/workflows/$WF_ID")
+    "$N8N_URL/api/v1/workflows/$WF_ID?publishIfActive=false")
 
   if [ "$HTTP_CODE" -eq 200 ]; then
     echo "  변경됨: \"$OLD_NAME\" → \"$NEW_NAME\""

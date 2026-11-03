@@ -139,12 +139,8 @@ if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
   WF_ID=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','unknown'))" 2>/dev/null || echo "unknown")
   echo "✅ 생성 성공! 워크플로우 ID: $WF_ID"
 
-  # 워크플로우 활성화
-  ACTIVATE_RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -X POST \
-    -H "X-N8N-API-KEY: ${API_KEY}" \
-    "${N8N_URL}/api/v1/workflows/${WF_ID}/activate")
-  ACTIVATE_CODE=$(echo "$ACTIVATE_RESPONSE" | tail -1)
+  # 워크플로우 게시 (n8n 2.0+의 Publish, 1.x의 활성화)
+  ACTIVATE_CODE=$(publish_workflow "${N8N_URL}" "${API_KEY}" "${WF_ID}")
   if [ "$ACTIVATE_CODE" -ge 200 ] && [ "$ACTIVATE_CODE" -lt 300 ]; then
     echo "✅ 활성화 완료!"
   else

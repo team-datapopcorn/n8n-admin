@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServer } from '@/lib/server-config'
-import { getWorkflow } from '@/lib/n8n-client'
+import { getWorkflow, updateWorkflow } from '@/lib/n8n-client'
 
 type Params = Promise<{ server: string }>
 
@@ -25,22 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
         const settings = (wf.settings ?? {}) as Record<string, unknown>
         settings.errorWorkflow = errorWorkflowId
 
-        const res = await fetch(`${server.url}/api/v1/workflows/${wfId}`, {
-          method: 'PUT',
-          headers: {
-            'X-N8N-API-KEY': server.apiKey,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ ...wf, settings }),
-        })
-
-        if (!res.ok) {
-          const text = await res.text()
-          results.push({ id: wfId, success: false, error: `HTTP ${res.status}: ${text}` })
-        } else {
-          results.push({ id: wfId, success: true })
-        }
+        // settings.errorWorkflow는 워크플로우 설정이라 게시 없이 바로 반영된다
+        await updateWorkflow(server, wfId, { ...wf, settings })
+        results.push({ id: wfId, success: true })
       } catch (e) {
         results.push({ id: wfId, success: false, error: String(e) })
       }

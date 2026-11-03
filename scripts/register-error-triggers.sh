@@ -85,7 +85,7 @@ echo "$WORKFLOWS" | jq -c '.[]' | while read -r wf; do
     }
 
     # settings.errorWorkflow 추가
-    UPDATED_WF=$(echo "$FULL_WF" | jq --arg ewf "$ERROR_WF_ID" '.settings.errorWorkflow = $ewf')
+    UPDATED_WF=$(echo "$FULL_WF" | jq --arg ewf "$ERROR_WF_ID" '.settings.errorWorkflow = $ewf' | jq "$N8N_WRITABLE_JQ")
 
     # PUT으로 업데이트
     UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -93,7 +93,7 @@ echo "$WORKFLOWS" | jq -c '.[]' | while read -r wf; do
       -H "Content-Type: application/json" \
       -H "X-N8N-API-KEY: $API_KEY" \
       -d "$UPDATED_WF" \
-      "$N8N_URL/api/v1/workflows/$WF_ID")
+      "$N8N_URL/api/v1/workflows/$WF_ID?publishIfActive=false")
 
     UPDATE_CODE=$(echo "$UPDATE_RESPONSE" | tail -1)
     if [ "$UPDATE_CODE" -ge 200 ] && [ "$UPDATE_CODE" -lt 300 ]; then

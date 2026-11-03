@@ -20,7 +20,10 @@ export interface ServerConfig {
 export interface N8nWorkflow {
   id: string
   name: string
+  /** n8n 2.0+에서 deprecated. 게시 여부는 isPublished()로 판단 */
   active: boolean
+  /** n8n 2.0+: 게시된 버전 ID (미게시면 null) */
+  activeVersionId?: string | null
   isArchived?: boolean
   createdAt: string
   updatedAt: string

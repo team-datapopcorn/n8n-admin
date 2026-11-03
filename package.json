@@ -1,6 +1,6 @@
 {
   "name": "n8n-admin-desktop",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "n8n 서버를 위한 관리 도구 키트. 워크플로우 백업·복원, 유저 관리, 크레덴셜 관리, 서버 이관 체크리스트, 웹 대시보드를 바로 사용할 수 있습니다.",
   "private": true,
   "packageManager": "pnpm@10.28.2",
@@ -8,7 +8,7 @@
   "dependencies": {
     "electron-store": "^8.2.0",
     "get-port": "^7.2.0",
-    "next": "16.1.6"
+    "next": "16.4.4"
   },
   "scripts": {
     "desktop:build": "./scripts/build-desktop.sh",
@@ -28,9 +28,9 @@
   },
   "homepage": "https://github.com/team-datapopcorn/n8n-admin#readme",
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "electron": "^41.0.3",
-    "electron-builder": "^26.8.1",
+    "@types/node": "^22.20.5",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.9.3"
   }
 }
